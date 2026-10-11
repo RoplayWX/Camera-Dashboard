@@ -487,6 +487,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       const cameraTitle = (camera.cleanName || camera.name || 'CAMERA').trim();
       const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
+      const locationText = (camera.location || camera.stateCode || 'US').trim();
       const lat = camera.coordinates?.[1] != null ? `${camera.coordinates[1].toFixed(4)}°` : '0.0000°';
       const lon = camera.coordinates?.[0] != null ? `${camera.coordinates[0].toFixed(4)}°` : '0.0000°';
       const coordsText = `[${lat}, ${lon}]`;
@@ -529,14 +530,17 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       const badgeHeight = Math.round(16 * scale);
 
       ctx.font = subFont;
-      const coordsWidth = ctx.measureText(coordsText).width;
+      const locationWidth = ctx.measureText(locationText).width;
       const bullet1Text = ' • ';
       const bullet1Width = ctx.measureText(bullet1Text).width;
-      const timeWidth = ctx.measureText(nowUtc).width;
+      const coordsWidth = ctx.measureText(coordsText).width;
       const bullet2Text = ' • ';
       const bullet2Width = ctx.measureText(bullet2Text).width;
+      const timeWidth = ctx.measureText(nowUtc).width;
+      const bullet3Text = ' • ';
+      const bullet3Width = ctx.measureText(bullet3Text).width;
       const brandWidth = ctx.measureText(brandText).width;
-      const row2Width = coordsWidth + bullet1Width + timeWidth + bullet2Width + brandWidth;
+      const row2Width = locationWidth + bullet1Width + coordsWidth + bullet2Width + timeWidth + bullet3Width + brandWidth;
 
       const dotRadius = Math.max(2.5, Math.round(3 * scale));
       const dotSpacing = Math.round(6 * scale);
@@ -629,32 +633,44 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       ctx.textBaseline = 'middle';
       ctx.fillText(sourceName, badgeX + badgeWidth / 2, row1CenterY);
 
-      // Row 2: Subtitle Line: [Coordinates] • Timestamp • Brand
+      // Row 2: Subtitle Line: Location • [Coordinates] • Timestamp • Brand
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.font = subFont;
       const subLineY = row2CenterY;
 
-      // Coordinates
+      // Location Text
       ctx.fillStyle = '#94a3b8';
-      ctx.fillText(coordsText, cardX + padX, subLineY);
+      ctx.fillText(locationText, cardX + padX, subLineY);
 
       // Bullet 1
       ctx.fillStyle = '#475569';
-      ctx.fillText(bullet1Text, cardX + padX + coordsWidth, subLineY);
+      const locX = cardX + padX + locationWidth;
+      ctx.fillText(bullet1Text, locX, subLineY);
 
-      // UTC Timestamp
+      // Coordinates
       ctx.fillStyle = '#cbd5e1';
-      const timeX = cardX + padX + coordsWidth + bullet1Width;
-      ctx.fillText(nowUtc, timeX, subLineY);
+      const coordsX = locX + bullet1Width;
+      ctx.fillText(coordsText, coordsX, subLineY);
 
       // Bullet 2
       ctx.fillStyle = '#475569';
-      ctx.fillText(bullet2Text, timeX + timeWidth, subLineY);
+      const b2X = coordsX + coordsWidth;
+      ctx.fillText(bullet2Text, b2X, subLineY);
+
+      // UTC Timestamp
+      ctx.fillStyle = '#cbd5e1';
+      const timeX = b2X + bullet2Width;
+      ctx.fillText(nowUtc, timeX, subLineY);
+
+      // Bullet 3
+      ctx.fillStyle = '#475569';
+      const b3X = timeX + timeWidth;
+      ctx.fillText(bullet3Text, b3X, subLineY);
 
       // Generic Brand Tag
       ctx.fillStyle = '#60a5fa';
-      ctx.fillText(brandText, timeX + timeWidth + bullet2Width, subLineY);
+      ctx.fillText(brandText, b3X + bullet3Width, subLineY);
 
       ctx.restore();
 

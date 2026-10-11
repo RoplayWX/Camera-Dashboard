@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import { CameraData } from '../types/camera';
 import { motion } from 'motion/react';
-import { Navigation, Radio } from 'lucide-react';
+import { Navigation, Radio, CloudRain } from 'lucide-react';
 
 interface CameraMapProps {
   cameras: CameraData[];
@@ -37,6 +37,55 @@ export const CameraMap: React.FC<CameraMapProps> = ({
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   const [mapStyle, setMapStyle] = useState<'osm-midnight' | 'esri-satellite'>('osm-midnight');
+  const [showRadar, setShowRadar] = useState(true);
+  const radarLayerRef = useRef<L.TileLayer | null>(null);
+
+  // Handle NEXRAD / Weather Radar overlay via RainViewer public API
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    if (!map) return;
+
+    if (!showRadar) {
+      if (radarLayerRef.current) {
+        map.removeLayer(radarLayerRef.current);
+        radarLayerRef.current = null;
+      }
+      return;
+    }
+
+    if (radarLayerRef.current) {
+      map.removeLayer(radarLayerRef.current);
+    }
+
+    let isMounted = true;
+    fetch('https://api.rainviewer.com/public/weather-maps.json')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!isMounted || !mapInstanceRef.current || !showRadar) return;
+        const past = data?.radar?.past;
+        if (past && past.length > 0) {
+          const latest = past[past.length - 1];
+          const path = latest.path;
+          if (radarLayerRef.current) {
+            map.removeLayer(radarLayerRef.current);
+          }
+          const radarUrl = `https://tile.rainviewer.com${path}/256/{z}/{x}/{y}/2/1_1.png`;
+          const rLayer = L.tileLayer(radarUrl, {
+            opacity: 0.65,
+            maxZoom: 19,
+            attribution: '&copy; RainViewer',
+          }).addTo(map);
+          radarLayerRef.current = rLayer;
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to load RainViewer radar:', err);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [showRadar]);
 
   // Initialize Map with 100% free tile provider (No API key needed)
   useEffect(() => {
@@ -107,9 +156,9 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
     const weatherWise = targetPool.filter((c) => c.source === 'WEATHER_WISE');
     const radarOmega = targetPool.filter((c) => c.source === 'RADAR_OMEGA');
-    const databaseSample = targetPool.filter((c) => c.source === 'DATABASE').slice(0, 500);
+    const databaseCams = targetPool.filter((c) => c.source === 'DATABASE').slice(0, 700);
 
-    const displaySet = new Set<CameraData>([...weatherWise, ...radarOmega, ...databaseSample]);
+    const displaySet = new Set<CameraData>([...weatherWise, ...radarOmega, ...databaseCams]);
     if (selectedCamera) displaySet.add(selectedCamera);
 
     const activeList = Array.from(displaySet);
@@ -314,6 +363,23 @@ export const CameraMap: React.FC<CameraMapProps> = ({
             <span className="text-xs font-extrabold text-white tracking-wider uppercase">
               RADAR & CAMERA NETWORK
             </span>
+          </div>
+
+          {/* NEXRAD Radar Toggle */}
+          <div className="flex items-center justify-between">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setShowRadar(!showRadar)}
+              className={`w-full px-3 py-1.5 rounded-lg border text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm ${
+                showRadar
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-[0_0_10px_rgba(59,130,246,0.5)]'
+                  : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300'
+              }`}
+            >
+              <CloudRain className={`w-3.5 h-3.5 ${showRadar ? 'text-white' : 'text-blue-400'}`} />
+              <span>{showRadar ? 'NEXRAD Mosaic: ON' : 'NEXRAD Mosaic: OFF'}</span>
+            </motion.button>
           </div>
 
           <div className="h-[1px] w-full bg-neutral-800/80 my-0.5" />

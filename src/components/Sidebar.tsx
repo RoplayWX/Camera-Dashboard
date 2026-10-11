@@ -79,7 +79,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return counts;
   }, [cameras]);
 
-  // Sorted list of all active states with counts
+  // Sorted list of all active states with counts in alphabetical order
   const availableStates = useMemo(() => {
     return Object.keys(stateCounts)
       .map((code) => ({
@@ -87,7 +87,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         name: US_STATES[code] || code,
         count: stateCounts[code] || 0,
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [stateCounts]);
 
   // Compute counts per source
