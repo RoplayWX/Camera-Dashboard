@@ -93,16 +93,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Compute counts per source
   const sourceCounts = useMemo(() => {
     let ww = 0;
-    let ro = 0;
+    let ro = 0; // Tower cameras (RadarOmega + HazCams)
+    let hz = 0;
     let db = 0;
     for (const c of cameras) {
       if (c.source === 'WEATHER_WISE') ww++;
-      else if (c.source === 'RADAR_OMEGA') ro++;
+      else if (c.source === 'RADAR_OMEGA' || c.source === 'HazCams') ro++;
+      else if (c.source === 'HazCams') hz++;
       else if (c.source === 'DATABASE') db++;
     }
     return {
       ww,
       ro,
+      hz,
       db,
       total: cameras.length,
       favs: favoriteIds.size,
@@ -116,6 +119,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     return cameras.filter((cam) => {
       if (sourceFilter === 'FAVORITES') {
         if (!favoriteIds.has(cam.id)) return false;
+      } else if (sourceFilter === 'RADAR_OMEGA') {
+        if (cam.source !== 'RADAR_OMEGA' && cam.source !== 'HazCams') return false;
       } else if (sourceFilter !== 'ALL') {
         if (cam.source !== sourceFilter) return false;
       }
@@ -304,15 +309,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
                 sourceFilter === 'RADAR_OMEGA'
-                  ? 'bg-white text-black border-white font-bold shadow-sm'
-                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                  ? 'bg-emerald-950/70 border-emerald-500 text-emerald-200 font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-emerald-300'
               }`}
             >
               <span className="flex items-center gap-1">
-                <Radio className="w-2.5 h-2.5 text-blue-400" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
                 Tower Cameras
               </span>
-              <span className="opacity-75 font-mono">{sourceCounts.ro}</span>
+              <span className="opacity-75 font-mono text-emerald-400/80">{sourceCounts.ro}</span>
             </motion.button>
 
             <motion.button
@@ -323,16 +328,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
                 sourceFilter === 'WEATHER_WISE'
-                  ? 'bg-white text-black border-white font-bold shadow-sm'
-                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                  ? 'bg-blue-950/70 border-blue-500 text-blue-200 font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-blue-300'
               }`}
             >
               <span className="flex items-center gap-1">
-                <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
+                <span className="w-2 h-2 rounded-full bg-blue-400 inline-block" />
                 Storm Chasers
               </span>
-              <span className="opacity-75 font-mono">{sourceCounts.ww}</span>
+              <span className="opacity-75 font-mono text-blue-400/80">{sourceCounts.ww}</span>
             </motion.button>
+
+
 
             <motion.button
               whileTap={{ scale: 0.97 }}
@@ -342,15 +349,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
               className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
                 sourceFilter === 'DATABASE'
-                  ? 'bg-white text-black border-white font-bold shadow-sm'
-                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                  ? 'bg-amber-950/70 border-amber-500 text-amber-200 font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-amber-300'
               }`}
             >
               <span className="flex items-center gap-1">
-                <Car className="w-2.5 h-2.5 text-neutral-400" />
+                <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
                 Traffic Cameras
               </span>
-              <span className="opacity-75 font-mono">{sourceCounts.db.toLocaleString()}</span>
+              <span className="opacity-75 font-mono text-amber-400/80">{sourceCounts.db.toLocaleString()}</span>
             </motion.button>
 
             <motion.button
@@ -538,19 +545,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       >
                         <GripVertical className="w-3 h-3" />
                       </div>
-                      {cam.source === 'RADAR_OMEGA' ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Radio className="w-2.5 h-2.5 text-blue-400" />
+                      {cam.source === 'RADAR_OMEGA' || cam.source === 'HazCams' ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5 text-emerald-400" />
                           Tower Camera
                         </span>
                       ) : cam.source === 'WEATHER_WISE' ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-white font-bold uppercase tracking-wider flex items-center gap-1">
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-600/80 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
                           <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
                           Storm Chaser
                         </span>
                       ) : (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-950 border border-neutral-800 text-neutral-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Car className="w-2.5 h-2.5 text-neutral-400" />
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-600/80 text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Car className="w-2.5 h-2.5 text-amber-400" />
                           Traffic Camera
                         </span>
                       )}
@@ -581,6 +588,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       
                       const sourceText = cam.source === 'RADAR_OMEGA'
                         ? 'Source: RadarOmega'
+                        : cam.source === 'HazCams'
+                        ? 'Source: HazCams'
                         : cam.source === 'WEATHER_WISE'
                         ? 'Source: WeatherWise'
                         : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')

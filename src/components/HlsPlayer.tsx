@@ -34,11 +34,13 @@ interface HlsPlayerProps {
   className?: string;
   ambientMode?: boolean;
   onAmbientColorChange?: (color: string) => void;
+  onInaccessible?: (cameraId: string) => void;
 }
 
 // Compute atmospheric ambient backlight derived from stream coordinates and solar position
 const getAtmosphericDefault = (camera: CameraData): string => {
   if (camera.source === 'RADAR_OMEGA') return '16, 185, 129';
+  if (camera.source === 'HazCams') return '6, 182, 212';
   if (camera.source === 'WEATHER_WISE') return '59, 130, 246';
   const [lng] = camera.coordinates || [-96, 39];
   const now = new Date();
@@ -66,11 +68,24 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   className = '',
   ambientMode = true,
   onAmbientColorChange,
+  onInaccessible,
 }) => {
   const isTopHudEnabled = showTopHud !== undefined ? showTopHud : !compact;
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const imageRef = useRef<HTMLImageElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
+  const [imageTimestamp, setImageTimestamp] = useState<number>(() => Date.now());
+
+  const isImageStream = Boolean(
+    camera.streamUrl &&
+      (camera.streamUrl.endsWith('.jpg') ||
+        camera.streamUrl.endsWith('.jpeg') ||
+        camera.streamUrl.endsWith('.png') ||
+        camera.streamUrl.includes('.jpg') ||
+        camera.streamUrl.includes('.jpeg') ||
+        camera.streamUrl.includes('.png'))
+  );
 
   // Stream state
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
@@ -82,6 +97,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [resolution, setResolution] = useState<string>('Detecting...');
   const [liveLatency, setLiveLatency] = useState<string>('0.8s');
+
+  // Auto-refresh interval for live traffic snapshot feeds (every 3.5 seconds)
+  useEffect(() => {
+    if (!isImageStream || hasError) return;
+    const interval = setInterval(() => {
+      setImageTimestamp(Date.now());
+    }, 3500);
+    return () => clearInterval(interval);
+  }, [isImageStream, hasError]);
 
   // HUD & PTZ visual states
   const [showHud, setShowHud] = useState<boolean>(true);
@@ -122,24 +146,23 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     startPanY: 0,
   });
 
-  // Jump to ultra low-latency live edge
+  // Jump to low-latency live edge with safe audio buffer
   const jumpToLiveEdge = useCallback(() => {
     const video = videoRef.current;
     if (!video) return;
     try {
       if (video.seekable && video.seekable.length > 0) {
         const liveTip = video.seekable.end(video.seekable.length - 1);
-        video.currentTime = Math.max(0, liveTip - 0.5);
+        video.currentTime = Math.max(0, liveTip - 2.5);
       }
     } catch {
       // Ignore
     }
   }, []);
 
-  // Initialize HLS player with Ultra Low Latency configuration
+  // Initialize HLS player or Live Snapshot Image Feed
   const setupStream = useCallback(() => {
-    const video = videoRef.current;
-    if (!video || !camera.streamUrl) {
+    if (!camera.streamUrl) {
       setIsLoading(false);
       setHasError(true);
       setErrorMessage('No stream URL available');
@@ -155,24 +178,77 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       hlsRef.current = null;
     }
 
+    // Direct Image Feeds (e.g. Florida DOT CCTV live refreshing feeds)
+    if (isImageStream) {
+      setImageTimestamp(Date.now());
+      setLiveLatency('LIVE (3s)');
+      return;
+    }
+
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Specialized high-efficiency player overhaul ONLY for HazCams
+    if (camera.source === 'HazCams') {
+      setIsLoading(false);
+      setHasError(false);
+      setErrorMessage('');
+
+      if (hlsRef.current) {
+        (hlsRef.current as any).destroy();
+        hlsRef.current = null;
+      }
+
+      if (video.canPlayType('application/vnd.apple.mpegurl')) {
+        video.src = camera.streamUrl;
+      } else if (Hls.isSupported()) {
+        const hls = new Hls({
+          enableWorker: false,
+          lowLatencyMode: true,
+          maxBufferLength: 8,
+          xhrSetup: (xhr) => {
+            xhr.withCredentials = false;
+          },
+        });
+        hlsRef.current = hls;
+        hls.loadSource(camera.streamUrl);
+        hls.attachMedia(video);
+      } else {
+        video.src = camera.streamUrl;
+      }
+
+      video.muted = isMuted;
+      video.play().catch(() => {
+        video.muted = true;
+        setIsMuted(true);
+        video.play().catch(() => {});
+      });
+      jumpToLiveEdge();
+      return;
+    }
+
     const isHlsSupported = Hls.isSupported();
     const canPlayNative = video.canPlayType('application/vnd.apple.mpegurl');
 
     if (isHlsSupported) {
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: true,
-        liveSyncDurationCount: 1,
-        liveMaxLatencyDurationCount: 2,
-        maxLiveSyncPlaybackRate: 1.15,
-        liveDurationInfinity: true,
-        maxBufferLength: 4,
-        maxMaxBufferLength: 6,
-        backBufferLength: 0,
-        manifestLoadingTimeOut: 7000,
-        manifestLoadingMaxRetry: 3,
-        levelLoadingTimeOut: 7000,
-        fragLoadingTimeOut: 9000,
+        lowLatencyMode: false, // Disabling aggressive LL mode prevents audio frame drops on demuxed streams
+        liveSyncDurationCount: 4, // 4-segment buffer prevents underruns
+        liveMaxLatencyDurationCount: 8,
+        maxBufferLength: 30, // 30s buffer completely resolves audio clicks and cut-outs on storm chasers and live streams
+        maxMaxBufferLength: 60,
+        backBufferLength: 15,
+        manifestLoadingTimeOut: 12000,
+        manifestLoadingMaxRetry: 4,
+        levelLoadingTimeOut: 12000,
+        fragLoadingTimeOut: 15000,
+        enableSoftwareAES: true,
+        stretchShortVideoTrack: true,
+        maxAudioFramesDrift: 2,
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = false;
+        },
       });
 
       hlsRef.current = hls;
@@ -202,12 +278,25 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         }
       });
 
+      let networkRetries = 0;
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
+            case Hls.ErrorTypes.NETWORK_ERROR: {
+              const code = data.response?.code || (data.response as any)?.status;
+              networkRetries++;
+              if ((code && code >= 400 && code < 500) || networkRetries > 3) {
+                setHasError(true);
+                setErrorMessage(code ? `Signal inaccessible (HTTP ${code})` : 'Feed refused connection / offline');
+                setIsLoading(false);
+                hls.destroy();
+                hlsRef.current = null;
+                onInaccessible?.(camera.id);
+                return;
+              }
               hls.startLoad();
               break;
+            }
             case Hls.ErrorTypes.MEDIA_ERROR:
               hls.recoverMediaError();
               break;
@@ -216,6 +305,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               setErrorMessage('Signal lost or feed offline');
               setIsLoading(false);
               hls.destroy();
+              hlsRef.current = null;
+              onInaccessible?.(camera.id);
               break;
           }
         }
@@ -232,13 +323,14 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         setHasError(true);
         setErrorMessage('Native video playback failed');
         setIsLoading(false);
+        onInaccessible?.(camera.id);
       });
     } else {
       setHasError(true);
       setErrorMessage('HLS playback is not supported on this browser');
       setIsLoading(false);
     }
-  }, [camera.streamUrl, autoPlay, jumpToLiveEdge]);
+  }, [camera.streamUrl, camera.id, autoPlay, jumpToLiveEdge, onInaccessible, isImageStream]);
 
   useEffect(() => {
     setupStream();
@@ -250,7 +342,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     };
   }, [setupStream]);
 
-  // Real-time Low-Latency Drift Monitor & Auto Catch-Up
+  // Smooth Low-Latency Live Drift Monitor (prevents playbackRate flapping & audio clicks)
   useEffect(() => {
     const interval = setInterval(() => {
       const video = videoRef.current;
@@ -261,13 +353,21 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         const drift = Math.max(0, liveEnd - video.currentTime);
         setLiveLatency(`${drift.toFixed(1)}s`);
 
-        if (drift > 2.5) {
-          video.playbackRate = 1.1;
-        } else if (video.playbackRate !== 1.0) {
+        // Only soft-resync if stream has fallen massively behind (> 25 seconds)
+        if (drift > 25) {
+          try {
+            video.currentTime = Math.max(0, liveEnd - 3);
+          } catch {
+            // Ignore
+          }
+        }
+
+        // Maintain steady 1.0x playback rate to eliminate audio pitch distortion and resampler clicks
+        if (video.playbackRate !== 1.0) {
           video.playbackRate = 1.0;
         }
       }
-    }, 1000);
+    }, 2000);
 
     return () => clearInterval(interval);
   }, [isPlaying]);
@@ -278,9 +378,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       return;
     }
 
-    const video = videoRef.current;
     const canvas = ambientCanvasRef.current;
-    if (!video || !canvas) return;
+    if (!canvas) return;
 
     let animId: number;
     let lastSampleTime = 0;
@@ -289,11 +388,18 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       // Sample at ~20fps for silky smooth ambient responsiveness
       if (now - lastSampleTime > 50) {
         lastSampleTime = now;
-        if (video.readyState >= 2 && !video.paused && !video.ended) {
+        const targetElement = isImageStream ? imageRef.current : videoRef.current;
+        if (!targetElement) return;
+
+        const isReady = isImageStream
+          ? Boolean(imageRef.current?.complete && imageRef.current?.naturalWidth > 0)
+          : Boolean(videoRef.current && videoRef.current.readyState >= 2 && !videoRef.current.paused && !videoRef.current.ended);
+
+        if (isReady) {
           const ctx = canvas.getContext('2d', { willReadFrequently: true });
           if (ctx) {
             try {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              ctx.drawImage(targetElement, 0, 0, canvas.width, canvas.height);
               const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
               const d = imgData.data;
               let r = 0, g = 0, b = 0, count = 0;
@@ -447,23 +553,28 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
   // Frame Capture / Snapshot with modern, minimal watermark
   const captureSnapshot = () => {
-    const video = videoRef.current;
-    if (!video) return;
+    const targetElement = isImageStream ? imageRef.current : videoRef.current;
+    if (!targetElement) return;
 
     try {
       const canvas = document.createElement('canvas');
-      const w = video.videoWidth || 1280;
-      const h = video.videoHeight || 720;
+      const w = isImageStream
+        ? (imageRef.current?.naturalWidth || 1280)
+        : (videoRef.current?.videoWidth || 1280);
+      const h = isImageStream
+        ? (imageRef.current?.naturalHeight || 720)
+        : (videoRef.current?.videoHeight || 720);
+
       canvas.width = w;
       canvas.height = h;
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      // Apply video filter if active (night vision, brightness/contrast)
+      // Apply video/image filter if active (night vision, brightness/contrast)
       if (ptz.nightVision !== 'off' || ptz.brightness !== 100 || ptz.contrast !== 100) {
         ctx.filter = getFilterStyle();
       }
-      ctx.drawImage(video, 0, 0, w, h);
+      ctx.drawImage(targetElement, 0, 0, w, h);
       ctx.filter = 'none';
 
       // Modern Minimal Watermark - Compact & Refined HUD
@@ -605,18 +716,31 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       // Source Badge Capsule
       const badgeX = textX + titleWidth + titleToBadgeGap;
       const badgeY = row1CenterY - badgeHeight / 2;
-      const isRadar = camera.source === 'RADAR_OMEGA';
 
-      ctx.fillStyle = isRadar ? 'rgba(30, 58, 138, 0.65)' : 'rgba(39, 39, 42, 0.65)';
+      let badgeFill = 'rgba(245, 158, 11, 0.3)';
+      let badgeStroke = 'rgba(245, 158, 11, 0.75)';
+      let badgeTextFill = '#fef3c7';
+
+      if (camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams') {
+        badgeFill = 'rgba(16, 185, 129, 0.3)';
+        badgeStroke = 'rgba(16, 185, 129, 0.75)';
+        badgeTextFill = '#d1fae5';
+      } else if (camera.source === 'WEATHER_WISE') {
+        badgeFill = 'rgba(59, 130, 246, 0.3)';
+        badgeStroke = 'rgba(59, 130, 246, 0.75)';
+        badgeTextFill = '#dbeafe';
+      }
+
+      ctx.fillStyle = badgeFill;
       roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, Math.round(3.5 * scale));
       ctx.fill();
 
-      ctx.strokeStyle = isRadar ? 'rgba(96, 165, 250, 0.35)' : 'rgba(113, 113, 122, 0.28)';
+      ctx.strokeStyle = badgeStroke;
       ctx.lineWidth = 0.75;
       ctx.stroke();
 
       ctx.font = badgeFont;
-      ctx.fillStyle = isRadar ? '#bfdbfe' : '#a1a1aa';
+      ctx.fillStyle = badgeTextFill;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(sourceName, badgeX + badgeWidth / 2, row1CenterY);
@@ -742,24 +866,52 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
       >
-
-        {/* Video element with digital transform */}
-      <div
-        className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black cursor-default"
-        onMouseDown={handleMouseDown}
-      >
-        <video
-          ref={videoRef}
-          playsInline
-          muted={isMuted}
-          className={`w-full h-full transition-transform duration-100 ease-out ${
-            ptz.aspectRatio === 'fill' ? 'object-cover' : 'object-contain'
-          }`}
-          style={{
-            transform: `scale(${ptz.zoom}) translate(${ptz.panX}px, ${ptz.panY}px)`,
-            filter: getFilterStyle(),
-          }}
-        />
+        {/* Media element wrapper with digital transform */}
+        <div
+          className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black cursor-default"
+          onMouseDown={handleMouseDown}
+        >
+          {isImageStream ? (
+          <img
+            ref={imageRef}
+            src={`${camera.streamUrl}${camera.streamUrl.includes('?') ? '&' : '?'}t=${imageTimestamp}`}
+            alt={camera.cleanName}
+            onLoad={(e) => {
+              setIsLoading(false);
+              const img = e.currentTarget;
+              if (img.naturalWidth && img.naturalHeight) {
+                setResolution(`${img.naturalWidth}x${img.naturalHeight}`);
+              }
+              setLiveLatency('LIVE SNAPSHOT (3s)');
+            }}
+            onError={() => {
+              setHasError(true);
+              setErrorMessage('Feed currently unavailable (404/Network)');
+              setIsLoading(false);
+              onInaccessible?.(camera.id);
+            }}
+            className={`w-full h-full transition-transform duration-100 ease-out select-none ${
+              ptz.aspectRatio === 'fill' ? 'object-cover' : 'object-contain'
+            }`}
+            style={{
+              transform: `scale(${ptz.zoom}) translate(${ptz.panX}px, ${ptz.panY}px)`,
+              filter: getFilterStyle(),
+            }}
+          />
+        ) : (
+          <video
+            ref={videoRef}
+            playsInline
+            muted={isMuted}
+            className={`w-full h-full transition-transform duration-100 ease-out ${
+              ptz.aspectRatio === 'fill' ? 'object-cover' : 'object-contain'
+            }`}
+            style={{
+              transform: `scale(${ptz.zoom}) translate(${ptz.panX}px, ${ptz.panY}px)`,
+              filter: getFilterStyle(),
+            }}
+          />
+        )}
 
         {showScanlines && <div className="absolute inset-0 scanlines pointer-events-none" />}
 
@@ -822,14 +974,14 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
             <span
               className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide ${
-                camera.source === 'RADAR_OMEGA'
-                  ? 'bg-blue-950/80 border-blue-800 text-blue-300'
+                camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
+                  ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
                   : camera.source === 'WEATHER_WISE'
-                  ? 'bg-neutral-900/90 border-neutral-700 text-white'
-                  : 'bg-neutral-950/90 border-neutral-800 text-neutral-300'
+                  ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                  : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
               }`}
             >
-              {getSourceDisplayName(camera.source)}
+              Tower Camera
             </span>
 
             <motion.button

@@ -27,7 +27,7 @@ export interface CameraData {
 
 export type ViewMode = 'focus' | 'grid-2x2' | 'grid-3x3' | 'map';
 
-export type CameraSourceFilter = 'ALL' | 'RADAR_OMEGA' | 'WEATHER_WISE' | 'DATABASE' | 'FAVORITES';
+export type CameraSourceFilter = 'ALL' | 'RADAR_OMEGA' | 'HazCams' | 'WEATHER_WISE' | 'DATABASE' | 'FAVORITES';
 
 export interface PTZState {
   zoom: number; // 1.0 to 4.0
@@ -52,6 +52,8 @@ export function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'RADAR_OMEGA':
       return 'RadarOmega';
+    case 'HazCams':
+      return 'HazCams';
     case 'WEATHER_WISE':
       return 'WeatherWise';
     case 'DATABASE':
@@ -61,29 +63,44 @@ export function getSourceDisplayName(source: string): string {
   }
 }
 
-export function getSourceBadgeStyle(source: string): { bg: string; text: string; border: string; label: string } {
+export function getSourceBadgeStyle(source: string): {
+  bg: string;
+  text: string;
+  border: string;
+  dot: string;
+  label: string;
+  hex: string;
+} {
   switch (source) {
+    case 'HazCams':
     case 'RADAR_OMEGA':
       return {
-        bg: 'bg-blue-950/70',
-        text: 'text-blue-400',
-        border: 'border-blue-800/80',
-        label: 'RadarOmega',
+        bg: 'bg-emerald-950/70',
+        text: 'text-emerald-300',
+        border: 'border-emerald-500/80',
+        dot: 'bg-emerald-400',
+        label: 'Tower Camera',
+        hex: '#10b981',
       };
     case 'WEATHER_WISE':
       return {
-        bg: 'bg-neutral-900',
-        text: 'text-white',
-        border: 'border-neutral-700',
-        label: 'WeatherWise',
+        bg: 'bg-blue-950/70',
+        text: 'text-blue-300',
+        border: 'border-blue-500/80',
+        dot: 'bg-blue-400',
+        label: 'Storm Chaser',
+        hex: '#3b82f6',
       };
     case 'DATABASE':
     default:
       return {
-        bg: 'bg-neutral-950',
-        text: 'text-neutral-300',
-        border: 'border-neutral-800',
-        label: 'Traffic DOT',
+        bg: 'bg-amber-950/70',
+        text: 'text-amber-300',
+        border: 'border-amber-500/80',
+        dot: 'bg-amber-400',
+        label: 'Traffic Feed',
+        hex: '#f59e0b',
       };
   }
 }
+

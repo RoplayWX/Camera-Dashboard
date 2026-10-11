@@ -214,21 +214,50 @@ code, kbd, samp, pre, .font-mono {
 .animate-eq-3 { animation: equalizer-bar 1.1s ease-in-out infinite 0.4s; }
 
 
-/* Map Popup Overrides */
+/* Map Popup & Black and White Map Styling */
 .leaflet-popup-content-wrapper {
-  background: #171717 !important;
-  color: white !important;
+  background: #0a0a0a !important;
+  color: #ffffff !important;
   border-radius: 0.5rem !important;
-  border: 1px solid #404040 !important;
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5) !important;
+  border: 1px solid #262626 !important;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.8) !important;
+  padding: 0 !important;
+}
+
+.leaflet-popup-content {
+  margin: 0 !important;
+  line-height: 1.4 !important;
 }
 
 .leaflet-popup-tip {
-  background: #171717 !important;
-  border-left: 1px solid #404040 !important;
-  border-bottom: 1px solid #404040 !important;
+  background: #0a0a0a !important;
+  border-left: 1px solid #262626 !important;
+  border-bottom: 1px solid #262626 !important;
 }
 
-.map-dark-filter {
-  filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+.leaflet-container a.leaflet-popup-close-button {
+  color: #a3a3a3 !important;
+  padding: 6px 8px 0 0 !important;
+}
+
+.leaflet-container a.leaflet-popup-close-button:hover {
+  color: #ffffff !important;
+}
+
+.map-bw-tiles {
+  filter: grayscale(100%) contrast(135%) brightness(95%);
+}
+
+/* Custom Blue Marker Clusters */
+.custom-blue-cluster {
+  background: transparent !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.custom-blue-cluster:hover {
+  transform: scale(1.12);
 }

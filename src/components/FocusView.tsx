@@ -27,6 +27,7 @@ interface FocusViewProps {
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
   onJumpToMap: () => void;
   onSelectCamera?: (camera: CameraData) => void;
+  onInaccessible?: (cameraId: string) => void;
 }
 
 export const FocusView: React.FC<FocusViewProps> = ({
@@ -39,6 +40,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
   onSnapshot,
   onJumpToMap,
   onSelectCamera,
+  onInaccessible,
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [showMetadata, setShowMetadata] = useState<boolean>(false);
@@ -150,14 +152,14 @@ export const FocusView: React.FC<FocusViewProps> = ({
               </span>
               <span
                 className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 border ${
-                  camera.source === 'RADAR_OMEGA'
-                    ? 'bg-blue-950/80 border-blue-800 text-blue-300'
+                  camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
+                    ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
                     : camera.source === 'WEATHER_WISE'
-                    ? 'bg-neutral-900 border-neutral-700 text-white'
-                    : 'bg-neutral-950 border-neutral-800 text-neutral-300'
+                    ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                    : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
                 }`}
               >
-                {camera.source === 'RADAR_OMEGA'
+                {camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
                   ? 'Tower Camera'
                   : camera.source === 'WEATHER_WISE'
                   ? 'Storm Chaser'
@@ -254,6 +256,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
           muted={false}
           onSnapshot={onSnapshot}
           onAmbientColorChange={setAmbientColor}
+          onInaccessible={onInaccessible}
           className="w-full h-full flex-1"
         />
 
@@ -271,7 +274,15 @@ export const FocusView: React.FC<FocusViewProps> = ({
                 <div>
                   <span className="text-neutral-500 text-[10px] block uppercase font-bold tracking-wider">Source Network</span>
                   <span className="font-bold text-white flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        camera.source === 'RADAR_OMEGA'
+                          ? 'bg-emerald-400 shadow-[0_0_6px_#10b981]'
+                          : camera.source === 'WEATHER_WISE'
+                          ? 'bg-blue-400 shadow-[0_0_6px_#3b82f6]'
+                          : 'bg-amber-400 shadow-[0_0_6px_#f59e0b]'
+                      }`}
+                    />
                     {camera.source === 'RADAR_OMEGA'
                       ? 'Radar Omega'
                       : camera.source === 'WEATHER_WISE'

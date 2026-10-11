@@ -23,6 +23,7 @@ interface MultiViewMatrixProps {
   onSelectFocus: (camera: CameraData) => void;
   onUpdateSlot: (index: number, camera: CameraData) => void;
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
+  onInaccessible?: (cameraId: string) => void;
 }
 
 export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
@@ -32,6 +33,7 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
   onSelectFocus,
   onUpdateSlot,
   onSnapshot,
+  onInaccessible,
 }) => {
   const slotCount = layout === 'grid-2x2' ? 4 : 9;
   const [activeAudioSlot, setActiveAudioSlot] = useState<number | null>(null);
@@ -292,14 +294,14 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                   </span>
                   <span
                     className={`px-1.5 py-0.5 rounded-md border font-bold text-[9px] uppercase tracking-wide shrink-0 ${
-                      camera.source === 'RADAR_OMEGA'
-                        ? 'bg-blue-950/80 border-blue-800 text-blue-300'
+                      camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
+                        ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
                         : camera.source === 'WEATHER_WISE'
-                        ? 'bg-neutral-900 border-neutral-700 text-white'
-                        : 'bg-neutral-950 border-neutral-800 text-neutral-300'
+                        ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                        : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
                     }`}
                   >
-                    {camera.source === 'RADAR_OMEGA'
+                    {camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
                       ? 'Tower Camera'
                       : camera.source === 'WEATHER_WISE'
                       ? 'Storm Chaser'
@@ -373,6 +375,7 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                   autoPlay={true}
                   muted={!isAudioActive}
                   onSnapshot={onSnapshot}
+                  onInaccessible={onInaccessible}
                   compact={true}
                   showTopHud={false}
                   showControls={false}
@@ -383,7 +386,15 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
               {/* Bottom strip */}
               <div className="absolute bottom-0 inset-x-0 z-20 flex items-center justify-between px-2.5 py-1 bg-gradient-to-t from-black via-black/80 to-transparent text-[10px] text-neutral-400">
                 <span className="truncate max-w-[180px]">{camera.location}</span>
-                <span className="text-neutral-300 uppercase font-bold text-[9px] tracking-wider px-1.5 py-0.5 rounded bg-neutral-900/80 border border-neutral-800">
+                <span
+                  className={`uppercase font-bold text-[9px] tracking-wider px-1.5 py-0.5 rounded border ${
+                    camera.source === 'RADAR_OMEGA'
+                      ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
+                      : camera.source === 'WEATHER_WISE'
+                      ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                      : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
+                  }`}
+                >
                   {getSourceDisplayName(camera.source)}
                 </span>
               </div>
@@ -445,7 +456,15 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                         <span className="text-white group-hover:text-blue-300 font-semibold truncate">
                           {cam.cleanName}
                         </span>
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-blue-300 font-bold uppercase shrink-0">
+                        <span
+                          className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase shrink-0 ${
+                            cam.source === 'RADAR_OMEGA'
+                              ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
+                              : cam.source === 'WEATHER_WISE'
+                              ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                              : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
+                          }`}
+                        >
                           {getSourceDisplayName(cam.source)}
                         </span>
                       </div>

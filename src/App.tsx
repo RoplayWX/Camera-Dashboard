@@ -5,6 +5,8 @@ import {
   CURATED_FEATURED_CAMERAS,
   getFavoriteIds,
   toggleFavorite,
+  getInaccessibleIds,
+  markCameraInaccessible,
 } from './services/cameraService';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -34,6 +36,9 @@ export default function App() {
   const [snapshots, setSnapshots] = useState<CapturedSnapshot[]>([]);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
 
+  // Inaccessible & dead streams pruning
+  const [inaccessibleIds, setInaccessibleIds] = useState<Set<string>>(() => getInaccessibleIds());
+
   // Responsive UI & State Filter
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedState, setSelectedState] = useState<string>('');
@@ -50,12 +55,12 @@ export default function App() {
         setIsInitializing(false);
 
         if (data.length > 0) {
-          const radarOrChaser = data.find((c) => c.source === 'RADAR_OMEGA' || c.source === 'WEATHER_WISE') || data[0];
+          const radarOrChaser = data.find((c) => c.source === 'RADAR_OMEGA' || c.source === 'HazCams' || c.source === 'WEATHER_WISE') || data[0];
           setSelectedCamera(radarOrChaser);
 
           const initialGrid = [
             ...data.filter((c) => c.source === 'WEATHER_WISE'),
-            ...data.filter((c) => c.source === 'RADAR_OMEGA').slice(0, 4),
+            ...data.filter((c) => c.source === 'RADAR_OMEGA' || c.source === 'HazCams').slice(0, 4),
             ...data.filter((c) => c.source === 'DATABASE').slice(0, 4),
           ].slice(0, 9);
           setGridCameras(initialGrid);
@@ -165,6 +170,20 @@ export default function App() {
     });
   }, []);
 
+  const handleMarkInaccessible = useCallback((id: string) => {
+    markCameraInaccessible(id);
+    setInaccessibleIds((prev) => new Set(prev).add(id));
+    setCameras((prev) => prev.filter((c) => c.id !== id));
+    setGridCameras((prev) => prev.filter((c) => c.id !== id));
+    setSelectedCamera((curr) => {
+      if (curr.id === id) {
+        const next = cameras.find((c) => c.id !== id);
+        return next || CURATED_FEATURED_CAMERAS[0];
+      }
+      return curr;
+    });
+  }, [cameras]);
+
   const handleSnapshotCaptured = useCallback((snap: CapturedSnapshot) => {
     setSnapshots((prev) => [snap, ...prev]);
   }, []);
@@ -241,6 +260,7 @@ export default function App() {
                   onSnapshot={handleSnapshotCaptured}
                   onJumpToMap={() => setViewMode('map')}
                   onSelectCamera={setSelectedCamera}
+                  onInaccessible={handleMarkInaccessible}
                 />
               </motion.div>
             )}
@@ -264,6 +284,7 @@ export default function App() {
                   }}
                   onUpdateSlot={handleUpdateGridSlot}
                   onSnapshot={handleSnapshotCaptured}
+                  onInaccessible={handleMarkInaccessible}
                 />
               </motion.div>
             )}

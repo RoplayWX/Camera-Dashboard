@@ -136,10 +136,12 @@ export const SnapshotGalleryModal: React.FC<SnapshotGalleryModalProps> = ({
                           <span
                             className={`px-1.5 py-0.5 rounded border font-bold uppercase text-[9px] ${
                               snap.source === 'RADAR_OMEGA'
-                                ? 'bg-blue-950/80 border-blue-800 text-blue-300'
+                                ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
+                                : snap.source === 'HazCams'
+                                ? 'bg-cyan-950/80 border-cyan-600/80 text-cyan-300'
                                 : snap.source === 'WEATHER_WISE'
-                                ? 'bg-neutral-900 border-neutral-700 text-white'
-                                : 'bg-neutral-950 border-neutral-800 text-neutral-300'
+                                ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
+                                : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
                             }`}
                           >
                             {getSourceDisplayName(snap.source)}
