@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import 'leaflet.markercluster/dist/MarkerCluster.css';
+import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import 'leaflet.markercluster';
 import { CameraData } from '../types/camera';
 import { motion } from 'motion/react';
 import { Navigation, Radio, CloudRain } from 'lucide-react';
@@ -34,7 +37,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 }) => {
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
-  const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const markersLayerRef = useRef<L.MarkerClusterGroup | null>(null);
   const radarLayerRef = useRef<L.TileLayer.WMS | null>(null);
 
   const [showRadar, setShowRadar] = useState(true);
@@ -60,7 +63,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
     }).addTo(map);
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
-    markersLayerRef.current = L.layerGroup().addTo(map);
+    markersLayerRef.current = L.markerClusterGroup().addTo(map);
     mapInstanceRef.current = map;
 
     return () => {
