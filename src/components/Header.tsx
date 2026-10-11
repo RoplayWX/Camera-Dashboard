@@ -82,11 +82,17 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="font-extrabold text-sm md:text-base tracking-tight text-white uppercase">
               CAMERA <span className="text-blue-500">DASHBOARD</span>
             </span>
-            <div className="text-[10px] text-neutral-400 hidden sm:flex items-center gap-1.5 font-mono">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6] animate-pulse" />
-              <span className="text-neutral-400">
-                {cameraCount > 0 ? `${cameraCount.toLocaleString()} Nodes` : 'Connecting...'}
-              </span>
+            <div className="hidden sm:flex items-center gap-2 font-mono text-[10px]">
+              <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-950 border border-neutral-800 text-neutral-400">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse" />
+                <span>{cameraCount > 0 ? `${cameraCount.toLocaleString()} NODES` : 'CONNECTING...'}</span>
+              </div>
+              {/* Micro Equalizer Visualizer */}
+              <div className="hidden md:flex items-center gap-0.5 h-3.5 px-1.5 py-0.5 rounded-md bg-neutral-950 border border-neutral-800/80">
+                <span className="w-0.5 bg-blue-400 rounded-full animate-eq-1" />
+                <span className="w-0.5 bg-blue-500 rounded-full animate-eq-2" />
+                <span className="w-0.5 bg-blue-400 rounded-full animate-eq-3" />
+              </div>
             </div>
           </div>
         </div>

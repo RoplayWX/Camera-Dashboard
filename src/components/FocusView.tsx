@@ -13,6 +13,8 @@ import {
   Plus,
   Info,
   Compass,
+  ArrowDownToLine,
+  Activity,
 } from 'lucide-react';
 
 interface FocusViewProps {
@@ -24,6 +26,7 @@ interface FocusViewProps {
   isFavorite: boolean;
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
   onJumpToMap: () => void;
+  onSelectCamera?: (camera: CameraData) => void;
 }
 
 export const FocusView: React.FC<FocusViewProps> = ({
@@ -35,9 +38,12 @@ export const FocusView: React.FC<FocusViewProps> = ({
   isFavorite,
   onSnapshot,
   onJumpToMap,
+  onSelectCamera,
 }) => {
   const [copied, setCopied] = useState<boolean>(false);
   const [showMetadata, setShowMetadata] = useState<boolean>(false);
+  const [ambientColor, setAmbientColor] = useState<string>('59, 130, 246');
+  const [isDragOver, setIsDragOver] = useState<boolean>(false);
 
   const handleCopyUrl = () => {
     if (camera.streamUrl) {
@@ -47,10 +53,76 @@ export const FocusView: React.FC<FocusViewProps> = ({
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const camJson = e.dataTransfer.getData('application/camera-json');
+    if (camJson && onSelectCamera) {
+      try {
+        const dropped = JSON.parse(camJson) as CameraData;
+        onSelectCamera(dropped);
+      } catch (err) {
+        console.error('Failed to parse dropped camera', err);
+      }
+    }
+  };
+
   return (
-    <div className="w-full h-full flex flex-col p-2 md:p-3 gap-2 overflow-hidden bg-[#000000]">
+    <div
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      className="relative w-full h-full flex flex-col p-2 md:p-3 gap-2 overflow-hidden bg-[#000000] cyber-grid-bg"
+    >
+      {/* Ambient Lighting Background Mesh Reflected from Stream */}
+      <div
+        className="absolute inset-0 pointer-events-none transition-all duration-700 -z-10"
+        style={{
+          background: `radial-gradient(circle at 50% 40%, rgba(${ambientColor}, 0.28) 0%, rgba(${ambientColor}, 0.1) 45%, rgba(${ambientColor}, 0.02) 75%, transparent 100%)`,
+        }}
+      />
+
+      {/* Holographic Drop Overlay */}
+      <AnimatePresence>
+        {isDragOver && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            className="absolute inset-3 z-50 bg-blue-950/85 backdrop-blur-md border-2 border-dashed border-blue-400 rounded-xl flex flex-col items-center justify-center p-6 text-center animate-drop-pulse shadow-[0_0_40px_rgba(59,130,246,0.6)]"
+          >
+            <div className="w-14 h-14 rounded-full bg-blue-500/20 border border-blue-400 flex items-center justify-center mb-3 animate-bounce">
+              <ArrowDownToLine className="w-7 h-7 text-blue-300" />
+            </div>
+            <h3 className="font-mono text-sm md:text-base font-bold text-white tracking-widest uppercase">
+              ENGAGE FEED IN FOCUS VIEW
+            </h3>
+            <p className="text-[11px] text-blue-300 mt-1 font-mono">
+              Release to switch active command feed
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
       {/* Top Feed Header & Actions */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-neutral-950 border border-neutral-800 text-xs">
+      <div
+        className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-xl bg-neutral-950/90 border border-neutral-800 text-xs transition-all duration-500"
+        style={{
+          boxShadow: `0 4px 24px rgba(${ambientColor}, 0.12)`,
+          borderColor: `rgba(${ambientColor}, 0.25)`,
+        }}
+      >
         <div className="flex items-center gap-2.5 min-w-0">
           <motion.button
             whileHover={{ scale: 1.08 }}
@@ -86,10 +158,10 @@ export const FocusView: React.FC<FocusViewProps> = ({
                 }`}
               >
                 {camera.source === 'RADAR_OMEGA'
-                  ? 'Radar Omega'
+                  ? 'Tower Camera'
                   : camera.source === 'WEATHER_WISE'
-                  ? 'Weather Wise'
-                  : 'Traffic DOT'}
+                  ? 'Storm Chaser'
+                  : 'Traffic Camera'}
               </span>
               <motion.button
                 whileHover={{ scale: 1.2 }}
@@ -175,12 +247,13 @@ export const FocusView: React.FC<FocusViewProps> = ({
       </div>
 
       {/* Main Player Display */}
-      <div className="flex-1 min-h-0 relative rounded-xl overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 relative flex flex-col p-1 sm:p-2.5">
         <HlsPlayer
           camera={camera}
           autoPlay={true}
           muted={false}
           onSnapshot={onSnapshot}
+          onAmbientColorChange={setAmbientColor}
           className="w-full h-full flex-1"
         />
 
@@ -192,7 +265,7 @@ export const FocusView: React.FC<FocusViewProps> = ({
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.2 }}
-              className="p-3 bg-neutral-950 border-t border-neutral-800 text-xs text-neutral-300 flex flex-wrap items-center justify-between gap-4 overflow-hidden"
+              className="mt-2 p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-300 flex flex-wrap items-center justify-between gap-4 overflow-hidden shadow-lg"
             >
               <div className="flex items-center gap-5">
                 <div>

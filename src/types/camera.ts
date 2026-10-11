@@ -51,9 +51,9 @@ export interface CapturedSnapshot {
 export function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'RADAR_OMEGA':
-      return 'Radar Omega';
+      return 'RadarOmega';
     case 'WEATHER_WISE':
-      return 'Weather Wise';
+      return 'WeatherWise';
     case 'DATABASE':
       return 'Traffic DOT';
     default:
@@ -68,14 +68,14 @@ export function getSourceBadgeStyle(source: string): { bg: string; text: string;
         bg: 'bg-blue-950/70',
         text: 'text-blue-400',
         border: 'border-blue-800/80',
-        label: 'Radar Omega',
+        label: 'RadarOmega',
       };
     case 'WEATHER_WISE':
       return {
         bg: 'bg-neutral-900',
         text: 'text-white',
         border: 'border-neutral-700',
-        label: 'Weather Wise',
+        label: 'WeatherWise',
       };
     case 'DATABASE':
     default:

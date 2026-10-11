@@ -238,6 +238,7 @@ export default function App() {
                   isFavorite={favoriteIds.has(selectedCamera.id)}
                   onSnapshot={handleSnapshotCaptured}
                   onJumpToMap={() => setViewMode('map')}
+                  onSelectCamera={setSelectedCamera}
                 />
               </motion.div>
             )}

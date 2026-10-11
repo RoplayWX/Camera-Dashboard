@@ -18,6 +18,7 @@ import {
   Tv,
   ExternalLink,
   Zap,
+  Sparkles,
 } from 'lucide-react';
 import { CameraData, CapturedSnapshot, PTZState, getSourceDisplayName } from '../types/camera';
 
@@ -31,7 +32,28 @@ interface HlsPlayerProps {
   compact?: boolean;
   onClose?: () => void;
   className?: string;
+  ambientMode?: boolean;
+  onAmbientColorChange?: (color: string) => void;
 }
+
+// Compute atmospheric ambient backlight derived from stream coordinates and solar position
+const getAtmosphericDefault = (camera: CameraData): string => {
+  if (camera.source === 'RADAR_OMEGA') return '16, 185, 129';
+  if (camera.source === 'WEATHER_WISE') return '59, 130, 246';
+  const [lng] = camera.coordinates || [-96, 39];
+  const now = new Date();
+  const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60;
+  const localSolarHours = (utcHours + lng / 15 + 24) % 24;
+
+  if (localSolarHours >= 6 && localSolarHours <= 8.5) {
+    return '245, 158, 77'; // Dawn golden hour
+  } else if (localSolarHours > 8.5 && localSolarHours < 17.5) {
+    return '56, 189, 248'; // Daylight cyan sky
+  } else if (localSolarHours >= 17.5 && localSolarHours <= 19.5) {
+    return '249, 115, 22'; // Sunset dusk amber
+  }
+  return '59, 130, 246'; // Nighttime indigo
+};
 
 export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   camera,
@@ -42,6 +64,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   showTopHud,
   compact = false,
   className = '',
+  ambientMode = true,
+  onAmbientColorChange,
 }) => {
   const isTopHudEnabled = showTopHud !== undefined ? showTopHud : !compact;
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -64,6 +88,20 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   const [showScanlines, setShowScanlines] = useState<boolean>(false);
   const [showPtzMenu, setShowPtzMenu] = useState<boolean>(false);
   const [snapshotFlash, setSnapshotFlash] = useState<boolean>(false);
+
+  // Dynamic Ambient Video Lighting
+  const [isAmbientEnabled, setIsAmbientEnabled] = useState<boolean>(ambientMode);
+  const [ambientRgb, setAmbientRgb] = useState<string>(() => getAtmosphericDefault(camera));
+  const ambientCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Keep ambient color synced when camera changes
+  useEffect(() => {
+    const initialColor = getAtmosphericDefault(camera);
+    setAmbientRgb(initialColor);
+    if (onAmbientColorChange) {
+      onAmbientColorChange(initialColor);
+    }
+  }, [camera.id, camera.source, onAmbientColorChange]);
 
   const [ptz, setPtz] = useState<PTZState>({
     zoom: 1.0,
@@ -234,6 +272,69 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     return () => clearInterval(interval);
   }, [isPlaying]);
 
+  // Real-time Ambient Lighting Frame Sampler
+  useEffect(() => {
+    if (!isAmbientEnabled) {
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = ambientCanvasRef.current;
+    if (!video || !canvas) return;
+
+    let animId: number;
+    let lastSampleTime = 0;
+
+    const sampleLoop = (now: number) => {
+      // Sample at ~20fps for silky smooth ambient responsiveness
+      if (now - lastSampleTime > 50) {
+        lastSampleTime = now;
+        if (video.readyState >= 2 && !video.paused && !video.ended) {
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          if (ctx) {
+            try {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const d = imgData.data;
+              let r = 0, g = 0, b = 0, count = 0;
+              for (let i = 0; i < d.length; i += 16) {
+                const pr = d[i], pg = d[i + 1], pb = d[i + 2];
+                // Filter out pitch-black pillarbox borders
+                if (pr > 15 || pg > 15 || pb > 15) {
+                  r += pr;
+                  g += pg;
+                  b += pb;
+                  count++;
+                }
+              }
+              if (count > 0) {
+                const avgR = Math.min(255, Math.round((r / count) * 1.3));
+                const avgG = Math.min(255, Math.round((g / count) * 1.3));
+                const avgB = Math.min(255, Math.round((b / count) * 1.3));
+                if (Math.max(avgR, avgG, avgB) > 20) {
+                  const colorStr = `${avgR}, ${avgG}, ${avgB}`;
+                  setAmbientRgb(colorStr);
+                  if (onAmbientColorChange) onAmbientColorChange(colorStr);
+                }
+              }
+            } catch {
+              // Canvas tainted by cross-origin stream:
+              // The canvas still paints live video frames visually with CSS blur!
+              // In addition, ensure ambientRgb has the atmospheric color
+              const fallback = getAtmosphericDefault(camera);
+              setAmbientRgb(fallback);
+              if (onAmbientColorChange) onAmbientColorChange(fallback);
+            }
+          }
+        }
+      }
+      animId = requestAnimationFrame(sampleLoop);
+    };
+
+    animId = requestAnimationFrame(sampleLoop);
+    return () => cancelAnimationFrame(animId);
+  }, [isAmbientEnabled, camera, onAmbientColorChange]);
+
   // Handle Play/Pause
   const togglePlay = () => {
     const video = videoRef.current;
@@ -365,18 +466,21 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       ctx.drawImage(video, 0, 0, w, h);
       ctx.filter = 'none';
 
-      // Modern Minimal Watermark
-      // Proportional scale factor based on 720p base
-      const scale = Math.max(0.75, Math.min(w / 1280, 2.0));
-      const padX = Math.round(16 * scale);
-      const padY = Math.round(11 * scale);
+      // Modern Minimal Watermark - Compact & Refined HUD
+      // Proportional scale factor optimized for a subtle, smaller footprint
+      const scale = Math.max(0.65, Math.min(w / 1600, 1.35));
 
-      const titleFontSize = Math.round(13 * scale);
-      const badgeFontSize = Math.round(10 * scale);
-      const subFontSize = Math.round(11 * scale);
+      // Compact, equalized padding and spacing
+      const padY = Math.round(9 * scale); // Top & bottom vertical padding
+      const padX = Math.round(13 * scale); // Left & right horizontal padding
+      const rowGap = Math.round(5 * scale); // Tight vertical gap between rows
 
-      const titleFont = `600 ${titleFontSize}px "Montserrat", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
-      const badgeFont = `700 ${badgeFontSize}px "Montserrat", sans-serif`;
+      const titleFontSize = Math.round(11 * scale);
+      const badgeFontSize = Math.round(8 * scale);
+      const subFontSize = Math.round(9 * scale);
+
+      const titleFont = `600 ${titleFontSize}px "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+      const badgeFont = `600 ${badgeFontSize}px "Plus Jakarta Sans", sans-serif`;
       const subFont = `500 ${subFontSize}px "JetBrains Mono", monospace`;
 
       const sourceName = getSourceDisplayName(camera.source).toUpperCase();
@@ -387,7 +491,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       const lon = camera.coordinates?.[0] != null ? `${camera.coordinates[0].toFixed(4)}°` : '0.0000°';
       const coordsText = `[${lat}, ${lon}]`;
       const brandText = 'CAMERA DASHBOARD';
-      const subLineText = `${coordsText}  •  ${nowUtc}  •  ${brandText}`;
 
       // Helper for rounded rectangle with native roundRect or fallback
       const roundRect = (
@@ -421,59 +524,76 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
       ctx.font = badgeFont;
       const badgeTextWidth = ctx.measureText(sourceName).width;
-      const badgePadX = Math.round(7 * scale);
+      const badgePadX = Math.round(5 * scale);
       const badgeWidth = badgeTextWidth + badgePadX * 2;
-      const badgeHeight = Math.round(18 * scale);
+      const badgeHeight = Math.round(16 * scale);
 
       ctx.font = subFont;
-      const subLineWidth = ctx.measureText(subLineText).width;
+      const coordsWidth = ctx.measureText(coordsText).width;
+      const bullet1Text = ' • ';
+      const bullet1Width = ctx.measureText(bullet1Text).width;
+      const timeWidth = ctx.measureText(nowUtc).width;
+      const bullet2Text = ' • ';
+      const bullet2Width = ctx.measureText(bullet2Text).width;
+      const brandWidth = ctx.measureText(brandText).width;
+      const row2Width = coordsWidth + bullet1Width + timeWidth + bullet2Width + brandWidth;
 
-      const dotRadius = Math.max(3, Math.round(3.5 * scale));
-      const dotSpacing = Math.round(10 * scale);
+      const dotRadius = Math.max(2.5, Math.round(3 * scale));
+      const dotSpacing = Math.round(6 * scale);
+      const titleToBadgeGap = Math.round(8 * scale);
 
-      const row1Width = dotRadius * 2 + dotSpacing + titleWidth + Math.round(10 * scale) + badgeWidth;
-      const cardInnerWidth = Math.max(row1Width, subLineWidth);
+      const row1Height = badgeHeight;
+      const row2Height = Math.round(11 * scale);
+
+      const row1Width = dotRadius * 2 + dotSpacing + titleWidth + titleToBadgeGap + badgeWidth;
+      const cardInnerWidth = Math.max(row1Width, row2Width);
       const cardWidth = cardInnerWidth + padX * 2;
-      const cardHeight = Math.round(52 * scale);
 
-      const margin = Math.round(20 * scale);
+      // Equalized compact height: padY (top) + row1Height + rowGap + row2Height + padY (bottom)
+      const cardHeight = padY + row1Height + rowGap + row2Height + padY;
+
+      const margin = Math.round(14 * scale);
       const cardX = margin;
       const cardY = h - cardHeight - margin;
-      const borderRadius = Math.round(8 * scale);
+      const borderRadius = Math.round(7 * scale);
+
+      // Centers for Row 1 and Row 2
+      const row1CenterY = cardY + padY + row1Height / 2;
+      const row2CenterY = cardY + padY + row1Height + rowGap + row2Height / 2;
 
       ctx.save();
 
-      // Soft subtle drop shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-      ctx.shadowBlur = Math.round(16 * scale);
-      ctx.shadowOffsetY = Math.round(3 * scale);
+      // Subtle, minimal soft shadow
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.45)';
+      ctx.shadowBlur = Math.round(10 * scale);
+      ctx.shadowOffsetY = Math.round(2 * scale);
 
-      // Card Background (dark translucent glass)
-      ctx.fillStyle = 'rgba(10, 10, 12, 0.82)';
+      // Card Background (modern dark translucent glass)
+      ctx.fillStyle = 'rgba(9, 9, 11, 0.72)';
       roundRect(ctx, cardX, cardY, cardWidth, cardHeight, borderRadius);
       ctx.fill();
 
-      // Hairline border
+      // Subtle hairline border
       ctx.shadowColor = 'transparent';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = Math.max(1, Math.round(1 * scale));
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      ctx.lineWidth = Math.max(0.75, Math.round(0.85 * scale));
       ctx.stroke();
 
       // Subtle top highlight inset line
       ctx.beginPath();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.moveTo(cardX + borderRadius, cardY + 1);
-      ctx.lineTo(cardX + cardWidth - borderRadius, cardY + 1);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+      ctx.moveTo(cardX + borderRadius, cardY + 0.75);
+      ctx.lineTo(cardX + cardWidth - borderRadius, cardY + 0.75);
       ctx.stroke();
 
-      // Dot placement
+      // Row 1: Dot placement
       const dotCenterX = cardX + padX + dotRadius;
-      const dotCenterY = cardY + padY + Math.round(titleFontSize * 0.45);
+      const dotCenterY = row1CenterY;
 
       // Faint blue glow around dot
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
       ctx.beginPath();
-      ctx.arc(dotCenterX, dotCenterY, dotRadius + Math.round(3 * scale), 0, 2 * Math.PI);
+      ctx.arc(dotCenterX, dotCenterY, dotRadius + Math.round(2 * scale), 0, 2 * Math.PI);
       ctx.fill();
 
       // Electric blue core dot
@@ -484,57 +604,53 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
 
       // Camera Title
       ctx.font = titleFont;
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = '#f8fafc';
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      const textX = dotCenterX + dotRadius + Math.round(7 * scale);
-      ctx.fillText(cameraTitle, textX, dotCenterY);
+      const textX = dotCenterX + dotRadius + dotSpacing;
+      ctx.fillText(cameraTitle, textX, row1CenterY);
 
       // Source Badge Capsule
-      const badgeX = textX + titleWidth + Math.round(8 * scale);
-      const badgeY = dotCenterY - badgeHeight / 2;
+      const badgeX = textX + titleWidth + titleToBadgeGap;
+      const badgeY = row1CenterY - badgeHeight / 2;
       const isRadar = camera.source === 'RADAR_OMEGA';
 
-      ctx.fillStyle = isRadar ? 'rgba(30, 58, 138, 0.7)' : 'rgba(38, 38, 38, 0.75)';
-      roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, Math.round(4 * scale));
+      ctx.fillStyle = isRadar ? 'rgba(30, 58, 138, 0.65)' : 'rgba(39, 39, 42, 0.65)';
+      roundRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, Math.round(3.5 * scale));
       ctx.fill();
 
-      ctx.strokeStyle = isRadar ? 'rgba(96, 165, 250, 0.45)' : 'rgba(115, 115, 115, 0.35)';
-      ctx.lineWidth = 1;
+      ctx.strokeStyle = isRadar ? 'rgba(96, 165, 250, 0.35)' : 'rgba(113, 113, 122, 0.28)';
+      ctx.lineWidth = 0.75;
       ctx.stroke();
 
       ctx.font = badgeFont;
-      ctx.fillStyle = isRadar ? '#93c5fd' : '#d4d4d4';
+      ctx.fillStyle = isRadar ? '#bfdbfe' : '#a1a1aa';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(sourceName, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2);
+      ctx.fillText(sourceName, badgeX + badgeWidth / 2, row1CenterY);
 
-      // Subtitle Line: [Coordinates] • Timestamp • Brand
+      // Row 2: Subtitle Line: [Coordinates] • Timestamp • Brand
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.font = subFont;
-      const subLineY = cardY + cardHeight - padY;
+      const subLineY = row2CenterY;
 
       // Coordinates
       ctx.fillStyle = '#94a3b8';
       ctx.fillText(coordsText, cardX + padX, subLineY);
-      const coordsWidth = ctx.measureText(coordsText).width;
 
       // Bullet 1
       ctx.fillStyle = '#475569';
-      ctx.fillText(' • ', cardX + padX + coordsWidth, subLineY);
-      const bullet1Width = ctx.measureText(' • ').width;
+      ctx.fillText(bullet1Text, cardX + padX + coordsWidth, subLineY);
 
       // UTC Timestamp
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillStyle = '#cbd5e1';
       const timeX = cardX + padX + coordsWidth + bullet1Width;
       ctx.fillText(nowUtc, timeX, subLineY);
-      const timeWidth = ctx.measureText(nowUtc).width;
 
       // Bullet 2
       ctx.fillStyle = '#475569';
-      ctx.fillText(' • ', timeX + timeWidth, subLineY);
-      const bullet2Width = ctx.measureText(' • ').width;
+      ctx.fillText(bullet2Text, timeX + timeWidth, subLineY);
 
       // Generic Brand Tag
       ctx.fillStyle = '#60a5fa';
@@ -584,14 +700,40 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   };
 
   return (
-    <div
-      ref={containerRef}
-      className={`relative group bg-[#000000] overflow-hidden rounded-xl border border-neutral-800 shadow-2xl select-none ${className}`}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseUp}
-    >
-      {/* Video element with digital transform */}
+    <div className={`relative ${className} flex flex-col`}>
+      {/* Dynamic Ambient Video Glow Aura */}
+      {isAmbientEnabled && (
+        <div className="absolute -inset-4 sm:-inset-8 -z-10 pointer-events-none transition-opacity duration-500">
+          <canvas
+            ref={ambientCanvasRef}
+            width={64}
+            height={36}
+            className="w-full h-full object-cover blur-3xl opacity-80 sm:opacity-95 saturate-200 brightness-125 transform scale-110 pointer-events-none"
+          />
+          <div
+            className="absolute -inset-4 transition-all duration-700 blur-3xl opacity-75"
+            style={{
+              background: `radial-gradient(ellipse at center, rgba(${ambientRgb}, 0.45) 0%, rgba(${ambientRgb}, 0.18) 50%, transparent 80%)`,
+            }}
+          />
+        </div>
+      )}
+
+      <div
+        ref={containerRef}
+        className="relative group bg-[#000000] overflow-hidden rounded-xl border border-neutral-800 shadow-2xl select-none w-full h-full flex-1 flex flex-col transition-all duration-300"
+        style={{
+          borderColor: isAmbientEnabled && ambientRgb ? `rgba(${ambientRgb}, 0.5)` : undefined,
+          boxShadow: isAmbientEnabled && ambientRgb
+            ? `0 0 35px rgba(${ambientRgb}, 0.25), 0 0 70px rgba(${ambientRgb}, 0.1)`
+            : undefined,
+        }}
+        onMouseMove={handleMouseMove}
+        onMouseUp={handleMouseUp}
+        onMouseLeave={handleMouseUp}
+      >
+
+        {/* Video element with digital transform */}
       <div
         className="w-full h-full relative overflow-hidden flex items-center justify-center bg-black cursor-default"
         onMouseDown={handleMouseDown}
@@ -933,6 +1075,21 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               <Tv className="w-3.5 h-3.5" />
             </motion.button>
 
+            {/* Dynamic Ambient Glow Toggle */}
+            <motion.button
+              whileHover={{ scale: 1.08 }}
+              whileTap={{ scale: 0.92 }}
+              onClick={() => setIsAmbientEnabled((v) => !v)}
+              className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                isAmbientEnabled
+                  ? 'bg-blue-950/80 text-blue-300 border-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.35)]'
+                  : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-400'
+              }`}
+              title={isAmbientEnabled ? 'Disable Ambient Video Glow' : 'Enable Dynamic Ambient Video Glow'}
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+            </motion.button>
+
             <motion.button
               whileHover={{ scale: 1.08 }}
               whileTap={{ scale: 0.92 }}
@@ -969,6 +1126,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

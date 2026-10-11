@@ -2,7 +2,19 @@ import React, { useState } from 'react';
 import { CameraData, CapturedSnapshot, getSourceDisplayName } from '../types/camera';
 import { HlsPlayer } from './HlsPlayer';
 import { motion, AnimatePresence } from 'motion/react';
-import { Maximize2, Shuffle, Volume2, VolumeX, X, Plus, Search } from 'lucide-react';
+import {
+  Maximize2,
+  Shuffle,
+  Volume2,
+  VolumeX,
+  X,
+  Plus,
+  Search,
+  ArrowDownToLine,
+  GripVertical,
+  Check,
+  Radio,
+} from 'lucide-react';
 
 interface MultiViewMatrixProps {
   layout: 'grid-2x2' | 'grid-3x3';
@@ -26,6 +38,11 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
   const [replacingSlotIndex, setReplacingSlotIndex] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  // Drag and Drop States
+  const [dragOverSlotIndex, setDragOverSlotIndex] = useState<number | null>(null);
+  const [dropSuccessIndex, setDropSuccessIndex] = useState<number | null>(null);
+  const [draggedSlotSource, setDraggedSlotSource] = useState<number | null>(null);
+
   const slots: (CameraData | null)[] = Array.from({ length: slotCount }).map((_, i) => {
     return activeCameras[i] || (allCameras[i] ?? null);
   });
@@ -44,6 +61,56 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
     }
   };
 
+  const handleSlotDragOver = (idx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+    if (dragOverSlotIndex !== idx) {
+      setDragOverSlotIndex(idx);
+    }
+  };
+
+  const handleSlotDragLeave = (idx: number, e: React.DragEvent) => {
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDragOverSlotIndex((curr) => (curr === idx ? null : curr));
+    }
+  };
+
+  const handleSlotDrop = (targetIdx: number, e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOverSlotIndex(null);
+    setDraggedSlotSource(null);
+
+    const slotIndexStr = e.dataTransfer.getData('application/slot-index');
+    const camJson = e.dataTransfer.getData('application/camera-json');
+
+    if (slotIndexStr) {
+      // Reordering between slots within the wall
+      const srcIdx = parseInt(slotIndexStr, 10);
+      if (!isNaN(srcIdx) && srcIdx !== targetIdx) {
+        const srcCam = slots[srcIdx];
+        const targetCam = slots[targetIdx];
+        if (srcCam) {
+          onUpdateSlot(targetIdx, srcCam);
+          if (targetCam) {
+            onUpdateSlot(srcIdx, targetCam);
+          }
+          setDropSuccessIndex(targetIdx);
+          setTimeout(() => setDropSuccessIndex(null), 1400);
+        }
+      }
+    } else if (camJson) {
+      // Dragged from sidebar camera list
+      try {
+        const droppedCam = JSON.parse(camJson) as CameraData;
+        onUpdateSlot(targetIdx, droppedCam);
+        setDropSuccessIndex(targetIdx);
+        setTimeout(() => setDropSuccessIndex(null), 1400);
+      } catch (err) {
+        console.error('Failed to parse dropped camera payload', err);
+      }
+    }
+  };
+
   const filteredForReplace = searchQuery.trim()
     ? allCameras
         .filter(
@@ -57,7 +124,7 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
   return (
     <div className="relative w-full h-full flex flex-col gap-2 p-2 bg-[#000000]">
       {/* Matrix Controls Top Bar */}
-      <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-neutral-950 border border-neutral-800 text-xs text-neutral-300">
+      <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-neutral-950/95 border border-neutral-800 text-xs text-neutral-300">
         <div className="flex items-center gap-3">
           <span className="font-bold text-white tracking-tight flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse" />
@@ -67,6 +134,10 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
           <span className="hidden sm:inline text-neutral-400 text-[11px] font-mono">
             {activeAudioSlot !== null ? `SOLO AUDIO: CH 0${activeAudioSlot + 1}` : 'ALL AUDIO MUTED'}
           </span>
+          <div className="hidden lg:flex items-center gap-1.5 text-[10px] text-blue-300 font-mono bg-blue-950/50 px-2 py-0.5 rounded-md border border-blue-900/60">
+            <ArrowDownToLine className="w-3 h-3 text-blue-400" />
+            <span>DRAG & DROP TO ASSIGN / REARRANGE</span>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">
@@ -90,33 +161,131 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
         }`}
       >
         {slots.map((camera, idx) => {
+          const isDragOver = dragOverSlotIndex === idx;
+          const isDropSuccess = dropSuccessIndex === idx;
+
           if (!camera) {
             return (
               <motion.div
                 whileHover={{ scale: 1.01 }}
                 key={`empty-slot-${idx}`}
-                className="relative rounded-xl border border-dashed border-neutral-800 bg-neutral-950 flex flex-col items-center justify-center p-4 text-center group cursor-pointer hover:border-neutral-600 transition-all"
+                onDragOver={(e) => handleSlotDragOver(idx, e)}
+                onDragLeave={(e) => handleSlotDragLeave(idx, e)}
+                onDrop={(e) => handleSlotDrop(idx, e)}
+                className={`relative rounded-xl border border-dashed flex flex-col items-center justify-center p-4 text-center group cursor-pointer transition-all overflow-hidden ${
+                  isDragOver
+                    ? 'border-blue-400 bg-blue-950/70 shadow-[0_0_25px_rgba(59,130,246,0.5)] animate-drop-pulse'
+                    : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'
+                }`}
                 onClick={() => setReplacingSlotIndex(idx)}
               >
+                {/* Holographic Drag Target Overlay */}
+                <AnimatePresence>
+                  {isDragOver && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      className="absolute inset-0 z-50 bg-blue-950/85 backdrop-blur-sm flex flex-col items-center justify-center p-3 text-center pointer-events-none"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-400 flex items-center justify-center mb-1.5 animate-bounce">
+                        <ArrowDownToLine className="w-5 h-5 text-blue-300" />
+                      </div>
+                      <span className="font-mono text-xs font-bold text-white tracking-wider uppercase">
+                        ASSIGN CH 0{idx + 1}
+                      </span>
+                      <span className="text-[10px] text-blue-300 font-mono mt-0.5">
+                        RELEASE TO LOCK FEED
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
                 <Plus className="w-7 h-7 text-neutral-600 group-hover:text-white transition-colors mb-1.5" />
-                <span className="text-xs text-neutral-500 group-hover:text-white font-medium">
+                <span className="text-xs text-neutral-400 group-hover:text-white font-mono font-medium">
                   ASSIGN CH 0{idx + 1}
+                </span>
+                <span className="text-[10px] text-neutral-600 mt-1">
+                  Click or drag camera here
                 </span>
               </motion.div>
             );
           }
 
           const isAudioActive = activeAudioSlot === idx;
+          const isBeingDragged = draggedSlotSource === idx;
 
           return (
             <motion.div
               layout
               key={`slot-${idx}-${camera.id}`}
-              className="relative rounded-xl overflow-hidden border border-neutral-800 bg-black group/cell flex flex-col min-h-[170px] shadow-lg transition-all hover:border-neutral-700"
+              draggable={true}
+              onDragStart={(e: any) => {
+                if (e.dataTransfer) {
+                  e.dataTransfer.setData('application/slot-index', String(idx));
+                  e.dataTransfer.setData('application/camera-json', JSON.stringify(camera));
+                  e.dataTransfer.effectAllowed = 'copyMove';
+                }
+                setDraggedSlotSource(idx);
+              }}
+              onDragEnd={() => setDraggedSlotSource(null)}
+              onDragOver={(e) => handleSlotDragOver(idx, e)}
+              onDragLeave={(e) => handleSlotDragLeave(idx, e)}
+              onDrop={(e) => handleSlotDrop(idx, e)}
+              className={`relative rounded-xl overflow-hidden border bg-black group/cell flex flex-col min-h-[170px] shadow-lg transition-all ${
+                isDragOver
+                  ? 'border-blue-400 shadow-[0_0_30px_rgba(59,130,246,0.6)]'
+                  : 'border-neutral-800 hover:border-neutral-600'
+              } ${isBeingDragged ? 'opacity-40 scale-95' : ''}`}
             >
+              {/* Holographic Drag Target Overlay */}
+              <AnimatePresence>
+                {isDragOver && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="absolute inset-0 z-50 bg-blue-950/85 backdrop-blur-sm border-2 border-dashed border-blue-400 rounded-xl flex flex-col items-center justify-center p-3 text-center pointer-events-none animate-drop-pulse"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-blue-500/20 border border-blue-400 flex items-center justify-center mb-1.5 animate-bounce">
+                      <ArrowDownToLine className="w-5 h-5 text-blue-300" />
+                    </div>
+                    <span className="font-mono text-xs font-bold text-white tracking-wider uppercase">
+                      SWAP / ASSIGN CH {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                    </span>
+                    <span className="text-[10px] text-blue-300 font-mono mt-0.5">
+                      RELEASE CURSOR TO LOCK
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Drop Confirmation Flash */}
+              <AnimatePresence>
+                {isDropSuccess && (
+                  <motion.div
+                    initial={{ opacity: 1 }}
+                    animate={{ opacity: 0 }}
+                    transition={{ duration: 1.4 }}
+                    className="absolute inset-0 z-40 bg-blue-500/30 border-2 border-blue-400 rounded-xl pointer-events-none flex items-center justify-center"
+                  >
+                    <span className="px-3 py-1 rounded bg-black/90 border border-blue-400 text-blue-300 font-mono text-xs font-bold shadow-2xl flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 text-blue-400" />
+                      CH {idx + 1 < 10 ? `0${idx + 1}` : idx + 1} LOCKED
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {/* Header inside cell */}
               <div className="absolute top-0 inset-x-0 z-30 flex items-center justify-between p-2 bg-gradient-to-b from-black/90 via-black/40 to-transparent pointer-events-auto">
                 <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                  <div
+                    className="cursor-grab active:cursor-grabbing p-0.5 rounded hover:bg-neutral-800 text-neutral-400 hover:text-white"
+                    title="Drag to rearrange slot"
+                  >
+                    <GripVertical className="w-3 h-3" />
+                  </div>
                   <span className="px-1.5 py-0.5 rounded-md bg-black/90 border border-neutral-800 text-white font-mono text-[9px] font-bold flex items-center gap-1 shrink-0">
                     <span className="w-1 h-1 rounded-full bg-blue-500 inline-block" />
                     CH {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
@@ -131,10 +300,10 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                     }`}
                   >
                     {camera.source === 'RADAR_OMEGA'
-                      ? 'Radar Omega'
+                      ? 'Tower Camera'
                       : camera.source === 'WEATHER_WISE'
-                      ? 'Weather Wise'
-                      : 'Traffic DOT'}
+                      ? 'Storm Chaser'
+                      : 'Traffic Camera'}
                   </span>
                   <span className="text-xs text-white truncate drop-shadow font-semibold">
                     {camera.cleanName}

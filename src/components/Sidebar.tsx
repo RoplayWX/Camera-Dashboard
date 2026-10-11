@@ -19,6 +19,8 @@ import {
   Layers,
   MapPin,
   RotateCcw,
+  GripVertical,
+  ArrowDownToLine,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -218,11 +220,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
               {sourceFilter === 'ALL'
                 ? 'All Sources'
                 : sourceFilter === 'RADAR_OMEGA'
-                ? 'Radar Omega'
+                ? 'Tower Cameras'
                 : sourceFilter === 'WEATHER_WISE'
-                ? 'Weather Wise'
+                ? 'Storm Chasers'
                 : sourceFilter === 'DATABASE'
-                ? 'Traffic DOT'
+                ? 'Traffic Cameras'
                 : 'Starred'}
             </span>
           </div>
@@ -257,7 +259,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <span className="flex items-center gap-1">
                 <Radio className="w-2.5 h-2.5 text-blue-400" />
-                Radar Omega
+                Tower Cameras
               </span>
               <span className="opacity-75 font-mono">{sourceCounts.ro}</span>
             </motion.button>
@@ -276,7 +278,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <span className="flex items-center gap-1">
                 <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
-                Weather Wise
+                Storm Chasers
               </span>
               <span className="opacity-75 font-mono">{sourceCounts.ww}</span>
             </motion.button>
@@ -295,7 +297,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <span className="flex items-center gap-1">
                 <Car className="w-2.5 h-2.5 text-neutral-400" />
-                Traffic DOT
+                Traffic Cameras
               </span>
               <span className="opacity-75 font-mono">{sourceCounts.db.toLocaleString()}</span>
             </motion.button>
@@ -388,6 +390,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
+          <span className="hidden sm:inline-flex items-center gap-1 text-[9px] text-blue-400 font-mono mr-1">
+            <ArrowDownToLine className="w-2.5 h-2.5" /> DRAG TO WALL
+          </span>
           <motion.button
             whileTap={{ scale: 0.9 }}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
@@ -438,30 +443,45 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <motion.div
                 whileHover={{ x: 2 }}
                 key={cam.id}
+                draggable={true}
+                onDragStart={(e: any) => {
+                  if (e.dataTransfer) {
+                    e.dataTransfer.setData('application/camera-json', JSON.stringify(cam));
+                    e.dataTransfer.setData('text/plain', cam.id);
+                    e.dataTransfer.effectAllowed = 'copyMove';
+                  }
+                }}
                 onClick={() => onSelectCamera(cam)}
-                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 group relative ${
+                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 group relative select-none ${
                   isSelected
                     ? 'bg-neutral-900 border border-neutral-700 shadow-sm'
                     : 'hover:bg-neutral-950 border border-transparent hover:border-neutral-800'
                 }`}
+                title="Click to focus or drag onto wall slots"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      <div
+                        className="cursor-grab active:cursor-grabbing p-0.5 rounded text-neutral-600 group-hover:text-neutral-400 hover:text-white transition-colors"
+                        title="Drag feed to wall slots"
+                      >
+                        <GripVertical className="w-3 h-3" />
+                      </div>
                       {cam.source === 'RADAR_OMEGA' ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
                           <Radio className="w-2.5 h-2.5 text-blue-400" />
-                          Radar Omega
+                          Tower Camera
                         </span>
                       ) : cam.source === 'WEATHER_WISE' ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-white font-bold uppercase tracking-wider flex items-center gap-1">
                           <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
-                          Weather Wise
+                          Storm Chaser
                         </span>
                       ) : (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-950 border border-neutral-800 text-neutral-300 font-bold uppercase tracking-wider flex items-center gap-1">
                           <Car className="w-2.5 h-2.5 text-neutral-400" />
-                          Traffic DOT
+                          Traffic Camera
                         </span>
                       )}
                       {cam.stateCode && (
@@ -489,10 +509,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       <span>•</span>
                       <span className="text-neutral-500 font-mono text-[9px] shrink-0">
                         {cam.source === 'RADAR_OMEGA'
-                          ? 'Source: Radar Omega'
+                          ? 'Source: RadarOmega'
                           : cam.source === 'WEATHER_WISE'
-                          ? 'Source: Weather Wise'
-                          : 'Source: State DOT'}
+                          ? 'Source: WeatherWise'
+                          : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
+                          ? 'Source: Max Velocity (WeatherFront)'
+                          : 'Source: Traffic DOT'}
                       </span>
                     </div>
                   </div>
