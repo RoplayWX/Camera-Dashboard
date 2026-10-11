@@ -42,7 +42,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
   const radarLayerRef = useRef<L.TileLayer.WMS | null>(null);
 
   const [showRadar, setShowRadar] = useState(true);
-  const [feedType, setFeedType] = useState<'ALL' | 'DATABASE' | 'RADAR_OMEGA' | 'HazCams' | 'WEATHER_WISE'>('ALL');
+  const [feedType, setFeedType] = useState<'ALL' | 'DATABASE' | 'RADAR_OMEGA' | 'WEATHER_WISE'>('ALL');
 
   // Counts for the HUD filter
   const counts = useMemo(() => {
@@ -57,8 +57,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
     for (const c of basePool) {
       if (c.source === 'DATABASE') traffic++;
-      else if (c.source === 'RADAR_OMEGA' || c.source === 'HazCams') towers++;
-      else if (c.source === 'HazCams') hazcams++;
+      else if (c.source === 'RADAR_OMEGA') towers++;
       else if (c.source === 'WEATHER_WISE') chasers++;
     }
 
@@ -66,7 +65,6 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       all: basePool.length,
       traffic,
       towers,
-      hazcams,
       chasers,
     };
   }, [cameras, selectedState]);
@@ -185,7 +183,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
     if (feedType !== 'ALL') {
       if (feedType === 'RADAR_OMEGA') {
-        targetPool = targetPool.filter((c) => c.source === 'RADAR_OMEGA' || c.source === 'HazCams');
+        targetPool = targetPool.filter((c) => c.source === 'RADAR_OMEGA');
       } else {
         targetPool = targetPool.filter((c) => c.source === feedType);
       }
@@ -200,7 +198,6 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       // Color coding per camera kind:
       // - Storm Chasers (WEATHER_WISE): Bright Blue (#3b82f6)
       // - Tower Cameras (RADAR_OMEGA): Emerald Green (#10b981)
-      // - HazCams (HazCams): Cyan (#06b6d4)
       // - Traffic Cameras (DATABASE): Amber / Warning Gold (#f59e0b)
       let pinColor = '#f59e0b';
       let haloColor = 'rgba(245, 158, 11, 0.6)';
@@ -208,7 +205,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       if (cam.source === 'WEATHER_WISE') {
         pinColor = '#3b82f6';
         haloColor = 'rgba(59, 130, 246, 0.85)';
-      } else if (cam.source === 'RADAR_OMEGA' || cam.source === 'HazCams') {
+      } else if (cam.source === 'RADAR_OMEGA') {
         pinColor = '#10b981';
         haloColor = 'rgba(16, 185, 129, 0.85)';
       }
@@ -229,7 +226,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
           ? cam.location
           : '';
 
-      const badgeStyle = getSourceBadgeStyle(cam.source);
+      const badgeStyle = getSourceBadgeStyle(cam);
       const badgeName = badgeStyle.label.toUpperCase();
       const badgeColor = badgeStyle.hex;
 

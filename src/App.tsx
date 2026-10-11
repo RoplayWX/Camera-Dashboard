@@ -55,12 +55,12 @@ export default function App() {
         setIsInitializing(false);
 
         if (data.length > 0) {
-          const radarOrChaser = data.find((c) => c.source === 'RADAR_OMEGA' || c.source === 'HazCams' || c.source === 'WEATHER_WISE') || data[0];
+          const radarOrChaser = data.find((c) => c.source === 'RADAR_OMEGA' || c.source === 'WEATHER_WISE') || data[0];
           setSelectedCamera(radarOrChaser);
 
           const initialGrid = [
             ...data.filter((c) => c.source === 'WEATHER_WISE'),
-            ...data.filter((c) => c.source === 'RADAR_OMEGA' || c.source === 'HazCams').slice(0, 4),
+            ...data.filter((c) => c.source === 'RADAR_OMEGA').slice(0, 4),
             ...data.filter((c) => c.source === 'DATABASE').slice(0, 4),
           ].slice(0, 9);
           setGridCameras(initialGrid);

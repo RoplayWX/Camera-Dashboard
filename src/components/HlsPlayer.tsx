@@ -20,7 +20,7 @@ import {
   Zap,
   Sparkles,
 } from 'lucide-react';
-import { CameraData, CapturedSnapshot, PTZState, getSourceDisplayName } from '../types/camera';
+import { CameraData, CapturedSnapshot, PTZState, getSourceDisplayName, getSourceBadgeStyle } from '../types/camera';
 
 interface HlsPlayerProps {
   camera: CameraData;
@@ -40,7 +40,7 @@ interface HlsPlayerProps {
 // Compute atmospheric ambient backlight derived from stream coordinates and solar position
 const getAtmosphericDefault = (camera: CameraData): string => {
   if (camera.source === 'RADAR_OMEGA') return '16, 185, 129';
-  if (camera.source === 'HazCams') return '6, 182, 212';
+
   if (camera.source === 'WEATHER_WISE') return '59, 130, 246';
   const [lng] = camera.coordinates || [-96, 39];
   const now = new Date();
@@ -127,6 +127,8 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     }
   }, [camera.id, camera.source, onAmbientColorChange]);
 
+
+
   const [ptz, setPtz] = useState<PTZState>({
     zoom: 1.0,
     panX: 0,
@@ -188,72 +190,49 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     const video = videoRef.current;
     if (!video) return;
 
-    // Specialized high-efficiency player overhaul ONLY for HazCams
-    if (camera.source === 'HazCams') {
-      setIsLoading(false);
-      setHasError(false);
-      setErrorMessage('');
-
-      if (hlsRef.current) {
-        (hlsRef.current as any).destroy();
-        hlsRef.current = null;
-      }
-
-      if (video.canPlayType('application/vnd.apple.mpegurl')) {
-        video.src = camera.streamUrl;
-      } else if (Hls.isSupported()) {
-        const hls = new Hls({
-          enableWorker: false,
-          lowLatencyMode: true,
-          maxBufferLength: 8,
-          xhrSetup: (xhr) => {
-            xhr.withCredentials = false;
-          },
-        });
-        hlsRef.current = hls;
-        hls.loadSource(camera.streamUrl);
-        hls.attachMedia(video);
-      } else {
-        video.src = camera.streamUrl;
-      }
-
-      video.muted = isMuted;
-      video.play().catch(() => {
-        video.muted = true;
-        setIsMuted(true);
-        video.play().catch(() => {});
-      });
-      jumpToLiveEdge();
-      return;
-    }
-
     const isHlsSupported = Hls.isSupported();
     const canPlayNative = video.canPlayType('application/vnd.apple.mpegurl');
 
     if (isHlsSupported) {
+
       const hls = new Hls({
         enableWorker: true,
-        lowLatencyMode: false, // Disabling aggressive LL mode prevents audio frame drops on demuxed streams
-        liveSyncDurationCount: 4, // 4-segment buffer prevents underruns
+        lowLatencyMode: false,
+        maxBufferLength: 30,
+        // Increased timeouts to debug "connecting" hang
+        manifestLoadingTimeOut: 30000,
+        fragLoadingTimeOut: 30000,
+        liveSyncDurationCount: 4,
         liveMaxLatencyDurationCount: 8,
-        maxBufferLength: 30, // 30s buffer completely resolves audio clicks and cut-outs on storm chasers and live streams
         maxMaxBufferLength: 60,
         backBufferLength: 15,
-        manifestLoadingTimeOut: 12000,
         manifestLoadingMaxRetry: 4,
-        levelLoadingTimeOut: 12000,
-        fragLoadingTimeOut: 15000,
         enableSoftwareAES: true,
         stretchShortVideoTrack: true,
         maxAudioFramesDrift: 2,
         xhrSetup: (xhr) => {
           xhr.withCredentials = false;
         },
+        loader: class ProxyLoader extends Hls.DefaultConfig.loader {
+          load(context: any, config: any, callbacks: any) {
+            super.load(context, config, callbacks);
+          }
+        },
       });
 
       hlsRef.current = hls;
-      hls.loadSource(camera.streamUrl);
+
+      // Add debug logging
+      Object.values(Hls.Events).forEach((event) => {
+        hls.on(event, (evt, data) => {
+          console.log(`HLS Event: ${evt}`, data);
+        });
+      });
+
       hls.attachMedia(video);
+      const streamUrl = camera.streamUrl;
+      hls.loadSource(streamUrl);
+      video.load();
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setIsLoading(false);
@@ -721,7 +700,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       let badgeStroke = 'rgba(245, 158, 11, 0.75)';
       let badgeTextFill = '#fef3c7';
 
-      if (camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams') {
+      if (camera.source === 'RADAR_OMEGA') {
         badgeFill = 'rgba(16, 185, 129, 0.3)';
         badgeStroke = 'rgba(16, 185, 129, 0.75)';
         badgeTextFill = '#d1fae5';
@@ -972,17 +951,14 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               <span>LIVE</span>
             </div>
 
-            <span
-              className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide ${
-                camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
-                  ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
-                  : camera.source === 'WEATHER_WISE'
-                  ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
-                  : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
-              }`}
-            >
-              Tower Camera
-            </span>
+            {(() => {
+              const badgeStyle = getSourceBadgeStyle(camera);
+              return (
+                <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wide ${badgeStyle.bg} ${badgeStyle.text} ${badgeStyle.border}`}>
+                  {badgeStyle.label}
+                </span>
+              );
+            })()}
 
             <motion.button
               whileHover={{ scale: 1.04 }}

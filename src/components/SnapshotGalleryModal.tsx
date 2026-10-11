@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CapturedSnapshot, getSourceDisplayName } from '../types/camera';
+import { CapturedSnapshot, getSourceDisplayName, getSourceBadgeStyle } from '../types/camera';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Download, Trash2, Camera, Calendar, MapPin, ZoomIn } from 'lucide-react';
 
@@ -133,19 +133,14 @@ export const SnapshotGalleryModal: React.FC<SnapshotGalleryModalProps> = ({
                             <Calendar className="w-2.5 h-2.5 text-neutral-400" />
                             <span>{new Date(snap.timestamp).toLocaleTimeString()}</span>
                           </div>
-                          <span
-                            className={`px-1.5 py-0.5 rounded border font-bold uppercase text-[9px] ${
-                              snap.source === 'RADAR_OMEGA'
-                                ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
-                                : snap.source === 'HazCams'
-                                ? 'bg-cyan-950/80 border-cyan-600/80 text-cyan-300'
-                                : snap.source === 'WEATHER_WISE'
-                                ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
-                                : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
-                            }`}
-                          >
-                            {getSourceDisplayName(snap.source)}
-                          </span>
+                          {(() => {
+                            const badgeStyle = getSourceBadgeStyle({ source: snap.source, cleanName: snap.cameraName });
+                            return (
+                              <span className={`px-1.5 py-0.5 rounded border font-bold uppercase text-[9px] ${badgeStyle.bg} ${badgeStyle.border} ${badgeStyle.text}`}>
+                                {badgeStyle.label}
+                              </span>
+                            );
+                          })()}
                         </div>
                       </div>
                     </motion.div>

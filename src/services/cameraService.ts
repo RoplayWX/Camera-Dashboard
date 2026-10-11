@@ -1,5 +1,4 @@
 import { CameraData, CameraFeature } from '../types/camera';
-import { HAZCAMS_CAMERAS } from './hazcamsData';
 
 const API_ENDPOINT = 'https://scriptkitty.cafe/relay/atmosx/cameras';
 const STORAGE_KEY_FAVORITES = 'camera_dashboard_favorites_v1';
@@ -61,7 +60,6 @@ export const US_STATES: Record<string, string> = {
 
 // High-reliability curated cameras for immediate fallback / featured rotation
 export const CURATED_FEATURED_CAMERAS: CameraData[] = [
-  ...HAZCAMS_CAMERAS.slice(0, 4),
   {
     id: 'cam-ww-1',
     name: 'Jaden Pappenheim (Lexington, Lexington County, SC)',
@@ -481,16 +479,7 @@ export async function fetchCameras(onProgress?: (loaded: number) => void): Promi
       }
 
       // Incorporate all 212 HazCams severe weather tower cameras!
-      for (const hazCam of HAZCAMS_CAMERAS) {
-        if (!seenIds.has(hazCam.id) && !seenUrls.has(hazCam.streamUrl) && !inaccessible.has(hazCam.id)) {
-          seenIds.add(hazCam.id);
-          seenUrls.add(hazCam.streamUrl);
-          combinedList.push({
-            ...hazCam,
-            isFavorite: favorites.has(hazCam.id),
-          });
-        }
-      }
+      // (HazCams removed)
 
       if (onProgress) {
         onProgress(combinedList.length);
@@ -586,7 +575,7 @@ export function filterCameras(
 
     if (source !== 'ALL' && source !== 'FAVORITES') {
       if (source === 'RADAR_OMEGA') {
-        if (cam.source !== 'RADAR_OMEGA' && cam.source !== 'HazCams') return false;
+        if (cam.source !== 'RADAR_OMEGA') return false;
       } else if (cam.source !== source) {
         return false;
       }

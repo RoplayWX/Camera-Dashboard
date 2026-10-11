@@ -27,7 +27,7 @@ export interface CameraData {
 
 export type ViewMode = 'focus' | 'grid-2x2' | 'grid-3x3' | 'map';
 
-export type CameraSourceFilter = 'ALL' | 'RADAR_OMEGA' | 'HazCams' | 'WEATHER_WISE' | 'DATABASE' | 'FAVORITES';
+export type CameraSourceFilter = 'ALL' | 'RADAR_OMEGA' | 'WEATHER_WISE' | 'DATABASE' | 'FAVORITES';
 
 export interface PTZState {
   zoom: number; // 1.0 to 4.0
@@ -52,8 +52,6 @@ export function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'RADAR_OMEGA':
       return 'RadarOmega';
-    case 'HazCams':
-      return 'HazCams';
     case 'WEATHER_WISE':
       return 'WeatherWise';
     case 'DATABASE':
@@ -63,7 +61,24 @@ export function getSourceDisplayName(source: string): string {
   }
 }
 
-export function getSourceBadgeStyle(source: string): {
+export function isChaser(cam: CameraData): boolean {
+  const name = cam.cleanName.toLowerCase();
+  const source = cam.source.toLowerCase();
+  const url = cam.streamUrl.toLowerCase();
+
+  // Explicit overrides for these specific chasers
+  if (name.includes('tornado paigeyy') || name.includes('connor croff')) {
+      return true;
+  }
+
+  return source === 'weather_wise' ||
+         name.includes('croff') ||
+         name.includes('weatherfront') ||
+         url.includes('weatherfront') ||
+         url.includes('maxvelocity');
+}
+
+export function getSourceBadgeStyle(cam: Partial<CameraData>): {
   bg: string;
   text: string;
   border: string;
@@ -71,8 +86,27 @@ export function getSourceBadgeStyle(source: string): {
   label: string;
   hex: string;
 } {
-  switch (source) {
-    case 'HazCams':
+  // We need to cast back to CameraData for isChaser, but since we only need source, cleanName and streamUrl,
+  // we can provide default values if they are missing.
+  const camData = {
+    ...cam,
+    cleanName: cam.cleanName || '',
+    source: cam.source || 'DATABASE',
+    streamUrl: cam.streamUrl || '',
+  } as CameraData;
+
+  if (isChaser(camData)) {
+    return {
+      bg: 'bg-blue-950/70',
+      text: 'text-blue-300',
+      border: 'border-blue-500/80',
+      dot: 'bg-blue-400',
+      label: 'Storm Chaser',
+      hex: '#3b82f6',
+    };
+  }
+
+  switch (camData.source) {
     case 'RADAR_OMEGA':
       return {
         bg: 'bg-emerald-950/70',
@@ -97,7 +131,7 @@ export function getSourceBadgeStyle(source: string): {
         bg: 'bg-amber-950/70',
         text: 'text-amber-300',
         border: 'border-amber-500/80',
-        dot: 'bg-amber-400',
+        dot: 'amber-400',
         label: 'Traffic Feed',
         hex: '#f59e0b',
       };

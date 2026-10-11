@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CameraData, CapturedSnapshot, getSourceDisplayName } from '../types/camera';
+import { CameraData, CapturedSnapshot, getSourceDisplayName, getSourceBadgeStyle } from '../types/camera';
 import { HlsPlayer } from './HlsPlayer';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -292,21 +292,14 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                     <span className="w-1 h-1 rounded-full bg-blue-500 inline-block" />
                     CH {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
                   </span>
-                  <span
-                    className={`px-1.5 py-0.5 rounded-md border font-bold text-[9px] uppercase tracking-wide shrink-0 ${
-                      camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
-                        ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
-                        : camera.source === 'WEATHER_WISE'
-                        ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
-                        : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
-                    }`}
-                  >
-                    {camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
-                      ? 'Tower Camera'
-                      : camera.source === 'WEATHER_WISE'
-                      ? 'Storm Chaser'
-                      : 'Traffic Camera'}
-                  </span>
+                  {(() => {
+                    const badgeStyle = getSourceBadgeStyle(camera);
+                    return (
+                      <span className={`px-1.5 py-0.5 rounded-md border font-bold text-[9px] uppercase tracking-wide shrink-0 ${badgeStyle.bg} ${badgeStyle.border} ${badgeStyle.text}`}>
+                        {badgeStyle.label}
+                      </span>
+                    );
+                  })()}
                   <span className="text-xs text-white truncate drop-shadow font-semibold">
                     {camera.cleanName}
                   </span>

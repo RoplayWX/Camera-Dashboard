@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CameraData, CapturedSnapshot } from '../types/camera';
+import { CameraData, CapturedSnapshot, getSourceBadgeStyle } from '../types/camera';
 import { HlsPlayer } from './HlsPlayer';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -150,21 +150,14 @@ export const FocusView: React.FC<FocusViewProps> = ({
               <span className="font-bold text-white text-sm md:text-base tracking-tight truncate max-w-sm md:max-w-md">
                 {camera.cleanName}
               </span>
-              <span
-                className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 border ${
-                  camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
-                    ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
-                    : camera.source === 'WEATHER_WISE'
-                    ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
-                    : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
-                }`}
-              >
-                {camera.source === 'RADAR_OMEGA' || camera.source === 'HazCams'
-                  ? 'Tower Camera'
-                  : camera.source === 'WEATHER_WISE'
-                  ? 'Storm Chaser'
-                  : 'Traffic Camera'}
-              </span>
+              {(() => {
+                const badgeStyle = getSourceBadgeStyle(camera);
+                return (
+                  <span className={`text-[10px] px-2 py-0.5 rounded-md font-bold uppercase tracking-wider shrink-0 flex items-center gap-1 border ${badgeStyle.bg} ${badgeStyle.border} ${badgeStyle.text}`}>
+                    {badgeStyle.label}
+                  </span>
+                );
+              })()}
               <motion.button
                 whileHover={{ scale: 1.2 }}
                 whileTap={{ scale: 0.8 }}

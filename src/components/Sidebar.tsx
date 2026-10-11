@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { CameraData, CameraSourceFilter } from '../types/camera';
+import { CameraData, CameraSourceFilter, isChaser } from '../types/camera';
 import { US_STATES } from '../services/cameraService';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -90,6 +90,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [stateCounts]);
 
+
   // Compute counts per source
   const sourceCounts = useMemo(() => {
     let ww = 0;
@@ -97,9 +98,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     let hz = 0;
     let db = 0;
     for (const c of cameras) {
-      if (c.source === 'WEATHER_WISE') ww++;
-      else if (c.source === 'RADAR_OMEGA' || c.source === 'HazCams') ro++;
-      else if (c.source === 'HazCams') hz++;
+      if (isChaser(c)) ww++;
+      else if (c.source === 'RADAR_OMEGA') ro++;
       else if (c.source === 'DATABASE') db++;
     }
     return {
@@ -120,7 +120,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
       if (sourceFilter === 'FAVORITES') {
         if (!favoriteIds.has(cam.id)) return false;
       } else if (sourceFilter === 'RADAR_OMEGA') {
-        if (cam.source !== 'RADAR_OMEGA' && cam.source !== 'HazCams') return false;
+        if (cam.source !== 'RADAR_OMEGA') return false;
+      } else if (sourceFilter === 'WEATHER_WISE') {
+        if (!isChaser(cam)) return false;
       } else if (sourceFilter !== 'ALL') {
         if (cam.source !== sourceFilter) return false;
       }
@@ -545,7 +547,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       >
                         <GripVertical className="w-3 h-3" />
                       </div>
-                      {cam.source === 'RADAR_OMEGA' || cam.source === 'HazCams' ? (
+                      {cam.source === 'RADAR_OMEGA' ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
                           <Radio className="w-2.5 h-2.5 text-emerald-400" />
                           Tower Camera
@@ -588,8 +590,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       
                       const sourceText = cam.source === 'RADAR_OMEGA'
                         ? 'Source: RadarOmega'
-                        : cam.source === 'HazCams'
-                        ? 'Source: HazCams'
                         : cam.source === 'WEATHER_WISE'
                         ? 'Source: WeatherWise'
                         : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
