@@ -588,14 +588,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         : 'Source: Traffic DOT';
 
                       return (
-                        <div className="flex items-center text-[10px] text-neutral-400 truncate gap-1.5 leading-none mt-3.5">
-                          {!isCityOnlyName && (
+                        <div className="flex items-center text-[10px] text-neutral-400 truncate gap-1.5 mt-1">
+                          {!isCityOnlyName && cam.location && (
                             <>
                               <span className="truncate">{cam.location}</span>
-                              <span className="text-neutral-600">•</span>
+                              <span className="text-neutral-600 shrink-0">•</span>
                             </>
                           )}
-                          <span className="text-neutral-500 font-mono text-[9px] shrink-0">
+                          <span className="text-neutral-500 font-mono text-[9px] shrink-0 translate-y-[1.5px]">
                             {sourceText}
                           </span>
                         </div>

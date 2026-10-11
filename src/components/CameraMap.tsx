@@ -14,11 +14,13 @@ interface CameraMapProps {
 }
 
 const REGION_PRESETS = [
-  { name: 'US National', center: [39.0, -96.0] as [number, number], zoom: 4 },
-  { name: 'Rocky Mountains (CO)', center: [39.5, -105.5] as [number, number], zoom: 8 },
-  { name: 'Southeast Radar (GA/SC)', center: [33.8, -82.5] as [number, number], zoom: 7 },
-  { name: 'Midwest Storm Alley', center: [36.5, -94.0] as [number, number], zoom: 6 },
-  { name: 'West Coast', center: [37.5, -120.0] as [number, number], zoom: 6 },
+  { name: 'National', center: [39.0, -96.0] as [number, number], zoom: 4 },
+  { name: 'Northwest', center: [45.5, -120.5] as [number, number], zoom: 6 },
+  { name: 'Northeast', center: [42.0, -73.5] as [number, number], zoom: 6 },
+  { name: 'Southwest', center: [33.5, -105.0] as [number, number], zoom: 6 },
+  { name: 'Southeast', center: [32.8, -83.6] as [number, number], zoom: 6 },
+  { name: 'Midwest', center: [41.5, -87.6] as [number, number], zoom: 6 },
+  { name: 'West Coast', center: [37.0, -120.0] as [number, number], zoom: 6 },
 ];
 
 export const CameraMap: React.FC<CameraMapProps> = ({
@@ -304,59 +306,37 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       />
 
       {/* Floating HUD Layer for Map Presets & Style Switcher */}
-      <div className="absolute top-3 left-3 z-[400] flex flex-col gap-2 pointer-events-auto">
-        <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-black/95 border border-neutral-800 shadow-2xl text-xs text-white">
-          <div className="flex items-center gap-2">
-            <Radio className="w-3.5 h-3.5 text-neutral-400" />
-            <span className="font-bold tracking-tight text-white uppercase">Radar Mesh</span>
-            <span className="px-1.5 py-0.5 rounded-md bg-neutral-900 text-neutral-300 font-bold text-[10px] border border-neutral-800 font-mono">
-              {cameras.length.toLocaleString()}
+      <div className="absolute top-3 left-3 z-[400] flex flex-col gap-2 pointer-events-auto max-w-md">
+        <div className="p-2.5 rounded-xl bg-black/95 border border-neutral-800 shadow-2xl flex flex-col gap-2">
+          {/* Restored Map Text */}
+          <div className="flex items-center gap-2 px-1">
+            <Radio className="w-3.5 h-3.5 text-blue-400 animate-pulse" />
+            <span className="text-xs font-extrabold text-white tracking-wider uppercase">
+              RADAR & CAMERA NETWORK
             </span>
           </div>
 
-          {/* Style toggle */}
-          <div className="flex items-center gap-1 bg-neutral-900 p-0.5 rounded-lg border border-neutral-800">
-            <button
-              onClick={() => setMapStyle('osm-midnight')}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                mapStyle === 'osm-midnight'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              Mono
-            </button>
-            <button
-              onClick={() => setMapStyle('esri-satellite')}
-              className={`px-2 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                mapStyle === 'esri-satellite'
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-neutral-400 hover:text-white'
-              }`}
-            >
-              Satellite
-            </button>
-          </div>
-        </div>
+          <div className="h-[1px] w-full bg-neutral-800/80 my-0.5" />
 
-        {/* Region Quick Jump */}
-        <div className="flex flex-wrap gap-1 max-w-sm">
-          {REGION_PRESETS.map((preset) => (
-            <motion.button
-              whileHover={{ scale: 1.04 }}
-              whileTap={{ scale: 0.96 }}
-              key={preset.name}
-              onClick={() => {
-                if (mapInstanceRef.current) {
-                  mapInstanceRef.current.flyTo(preset.center, preset.zoom, { duration: 0.8 });
-                }
-              }}
-              className="px-2.5 py-1 rounded-lg bg-black/90 hover:bg-neutral-900 border border-neutral-800 text-neutral-300 hover:text-white text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 shadow-md"
-            >
-              <Navigation className="w-2.5 h-2.5 text-blue-400" />
-              {preset.name}
-            </motion.button>
-          ))}
+          {/* Region Presets */}
+          <div className="flex flex-wrap gap-1 items-center">
+            {REGION_PRESETS.map((preset) => (
+              <motion.button
+                whileHover={{ scale: 1.04 }}
+                whileTap={{ scale: 0.96 }}
+                key={preset.name}
+                onClick={() => {
+                  if (mapInstanceRef.current) {
+                    mapInstanceRef.current.flyTo(preset.center, preset.zoom, { duration: 0.8 });
+                  }
+                }}
+                className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white text-[10px] font-semibold transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+              >
+                <Navigation className="w-2.5 h-2.5 text-blue-400" />
+                {preset.name}
+              </motion.button>
+            ))}
+          </div>
         </div>
       </div>
 
