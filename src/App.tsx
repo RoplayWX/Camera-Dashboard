@@ -20,7 +20,7 @@ import { Radio } from 'lucide-react';
 export default function App() {
   const [cameras, setCameras] = useState<CameraData[]>(CURATED_FEATURED_CAMERAS);
   const [selectedCamera, setSelectedCamera] = useState<CameraData>(CURATED_FEATURED_CAMERAS[0]);
-  const [gridCameras, setGridCameras] = useState<CameraData[]>(CURATED_FEATURED_CAMERAS.slice(0, 9));
+  const [gridCameras, setGridCameras] = useState<(CameraData | null)[]>(CURATED_FEATURED_CAMERAS.slice(0, 9));
   const [viewMode, setViewMode] = useState<ViewMode>('focus');
 
   // Loading state
@@ -155,16 +155,26 @@ export default function App() {
 
   const handleAddToGrid = useCallback((cam: CameraData) => {
     setGridCameras((prev) => {
-      const exists = prev.find((c) => c.id === cam.id);
+      const exists = prev.find((c) => c?.id === cam.id);
       if (exists) return prev;
+      // If there's an empty slot, fill the first empty slot
+      const emptyIdx = prev.findIndex((c) => c === null);
+      if (emptyIdx !== -1) {
+        const updated = [...prev];
+        updated[emptyIdx] = cam;
+        return updated;
+      }
       return [cam, ...prev.slice(0, 8)];
     });
     setViewMode('grid-2x2');
   }, []);
 
-  const handleUpdateGridSlot = useCallback((index: number, cam: CameraData) => {
+  const handleUpdateGridSlot = useCallback((index: number, cam: CameraData | null) => {
     setGridCameras((prev) => {
       const updated = [...prev];
+      while (updated.length <= index) {
+        updated.push(null);
+      }
       updated[index] = cam;
       return updated;
     });
@@ -174,7 +184,7 @@ export default function App() {
     markCameraInaccessible(id);
     setInaccessibleIds((prev) => new Set(prev).add(id));
     setCameras((prev) => prev.filter((c) => c.id !== id));
-    setGridCameras((prev) => prev.filter((c) => c.id !== id));
+    setGridCameras((prev) => prev.map((c) => (c?.id === id ? null : c)));
     setSelectedCamera((curr) => {
       if (curr.id === id) {
         const next = cameras.find((c) => c.id !== id);
