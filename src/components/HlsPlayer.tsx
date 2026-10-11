@@ -488,6 +488,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       const nowUtc = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';
 
       const locationText = (camera.location || camera.stateCode || 'US').trim();
+      const hasLocation = locationText !== '' && locationText !== 'null';
       const lat = camera.coordinates?.[1] != null ? `${camera.coordinates[1].toFixed(4)}°` : '0.0000°';
       const lon = camera.coordinates?.[0] != null ? `${camera.coordinates[0].toFixed(4)}°` : '0.0000°';
       const coordsText = `[${lat}, ${lon}]`;
@@ -590,28 +591,15 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       ctx.lineTo(cardX + cardWidth - borderRadius, cardY + 0.75);
       ctx.stroke();
 
-      // Row 1: Dot placement
-      const dotCenterX = cardX + padX + dotRadius;
-      const dotCenterY = row1CenterY;
+      // Row 1: Camera Title placeholder start
 
-      // Faint blue glow around dot
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
-      ctx.beginPath();
-      ctx.arc(dotCenterX, dotCenterY, dotRadius + Math.round(2 * scale), 0, 2 * Math.PI);
-      ctx.fill();
-
-      // Electric blue core dot
-      ctx.fillStyle = '#3b82f6';
-      ctx.beginPath();
-      ctx.arc(dotCenterX, dotCenterY, dotRadius, 0, 2 * Math.PI);
-      ctx.fill();
 
       // Camera Title
       ctx.font = titleFont;
       ctx.fillStyle = '#f8fafc';
       ctx.textBaseline = 'middle';
       ctx.textAlign = 'left';
-      const textX = dotCenterX + dotRadius + dotSpacing;
+      const textX = cardX + padX;
       ctx.fillText(cameraTitle, textX, row1CenterY);
 
       // Source Badge Capsule
@@ -639,38 +627,44 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       ctx.font = subFont;
       const subLineY = row2CenterY;
 
-      // Location Text
-      ctx.fillStyle = '#94a3b8';
-      ctx.fillText(locationText, cardX + padX, subLineY);
 
-      // Bullet 1
-      ctx.fillStyle = '#475569';
-      const locX = cardX + padX + locationWidth;
-      ctx.fillText(bullet1Text, locX, subLineY);
+
+      let currentX = cardX + padX;
+
+      // Location Text (conditional)
+      if (hasLocation) {
+        ctx.fillStyle = '#94a3b8';
+        ctx.fillText(locationText, currentX, subLineY);
+        currentX += locationWidth;
+        
+        ctx.fillStyle = '#475569';
+        ctx.fillText(bullet1Text, currentX, subLineY);
+        currentX += bullet1Width;
+      }
 
       // Coordinates
       ctx.fillStyle = '#cbd5e1';
-      const coordsX = locX + bullet1Width;
-      ctx.fillText(coordsText, coordsX, subLineY);
+      ctx.fillText(coordsText, currentX, subLineY);
+      currentX += coordsWidth;
 
       // Bullet 2
       ctx.fillStyle = '#475569';
-      const b2X = coordsX + coordsWidth;
-      ctx.fillText(bullet2Text, b2X, subLineY);
+      ctx.fillText(bullet2Text, currentX, subLineY);
+      currentX += bullet2Width;
 
       // UTC Timestamp
       ctx.fillStyle = '#cbd5e1';
-      const timeX = b2X + bullet2Width;
-      ctx.fillText(nowUtc, timeX, subLineY);
+      ctx.fillText(nowUtc, currentX, subLineY);
+      currentX += timeWidth;
 
       // Bullet 3
       ctx.fillStyle = '#475569';
-      const b3X = timeX + timeWidth;
-      ctx.fillText(bullet3Text, b3X, subLineY);
+      ctx.fillText(bullet3Text, currentX, subLineY);
+      currentX += bullet3Width;
 
       // Generic Brand Tag
       ctx.fillStyle = '#60a5fa';
-      ctx.fillText(brandText, b3X + bullet3Width, subLineY);
+      ctx.fillText(brandText, currentX, subLineY);
 
       ctx.restore();
 

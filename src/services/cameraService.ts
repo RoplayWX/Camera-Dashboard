@@ -240,6 +240,10 @@ export async function fetchCameras(onProgress?: (loaded: number) => void): Promi
           source: (feat.properties?.source as any) || 'DATABASE',
           isFavorite: favorites.has(id),
         };
+      }).filter((cam) => {
+        const url = cam.streamUrl?.toLowerCase() || '';
+        const forbiddenKeywords = ['login', 'signin', 'auth', 'access', 'secure', 'admin', 'weblogin', 'password', 'divas.cloud', 'dot.ga.gov', '404', '401', '403', 'forbidden', 'unauthorized', 'error', 'dead', 'camera-offline', 'cctv-not-found'];
+        return !forbiddenKeywords.some(keyword => url.includes(keyword)) && cam.source !== 'UNKNOWN';
       });
 
       if (onProgress) {
