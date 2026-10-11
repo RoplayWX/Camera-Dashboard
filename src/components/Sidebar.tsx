@@ -547,15 +547,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                       >
                         <GripVertical className="w-3 h-3" />
                       </div>
-                      {cam.source === 'RADAR_OMEGA' ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Radio className="w-2.5 h-2.5 text-emerald-400" />
-                          Tower Camera
-                        </span>
-                      ) : cam.source === 'WEATHER_WISE' ? (
+                      {isChaser(cam) ? (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-600/80 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
                           <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
                           Storm Chaser
+                        </span>
+                      ) : cam.source === 'RADAR_OMEGA' ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5 text-emerald-400" />
+                          Tower Camera
                         </span>
                       ) : (
                         <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-600/80 text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1">
