@@ -1,0 +1,6 @@
+{
+  "name": "Camera Dashboard",
+  "description": "Dynamic surveillance and live weather monitoring dashboard featuring over 42,000 live open camera streams, filter by state and source.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

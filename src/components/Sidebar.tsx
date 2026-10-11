@@ -1,0 +1,569 @@
+import React, { useState, useMemo } from 'react';
+import { CameraData, CameraSourceFilter } from '../types/camera';
+import { US_STATES } from '../services/cameraService';
+import { motion, AnimatePresence } from 'motion/react';
+import {
+  Search,
+  Star,
+  Radio,
+  CloudLightning,
+  Video,
+  Navigation,
+  Shuffle,
+  ChevronLeft,
+  ChevronRight,
+  Filter,
+  X,
+  Plus,
+  Car,
+  Layers,
+  MapPin,
+  RotateCcw,
+} from 'lucide-react';
+
+interface SidebarProps {
+  cameras: CameraData[];
+  selectedCamera: CameraData | null;
+  onSelectCamera: (camera: CameraData) => void;
+  onAddToGrid: (camera: CameraData) => void;
+  onToggleFavorite: (id: string) => void;
+  favoriteIds: Set<string>;
+  onRandomFeed: () => void;
+  className?: string;
+  selectedState?: string;
+  onSelectState?: (state: string) => void;
+}
+
+const ITEMS_PER_PAGE = 40;
+
+const POPULAR_QUICK_STATES = ['GA', 'FL', 'TX', 'CA', 'CO', 'NY', 'VA', 'SC', 'MO'];
+
+export const Sidebar: React.FC<SidebarProps> = ({
+  cameras,
+  selectedCamera,
+  onSelectCamera,
+  onAddToGrid,
+  onToggleFavorite,
+  favoriteIds,
+  onRandomFeed,
+  className = '',
+  selectedState: externalSelectedState,
+  onSelectState: externalOnSelectState,
+}) => {
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [sourceFilter, setSourceFilter] = useState<CameraSourceFilter>('ALL');
+  const [internalSelectedState, setInternalSelectedState] = useState<string>('');
+  const [page, setPage] = useState<number>(1);
+
+  const selectedState = externalSelectedState !== undefined ? externalSelectedState : internalSelectedState;
+  const setSelectedState = (st: string) => {
+    if (externalOnSelectState) externalOnSelectState(st);
+    setInternalSelectedState(st);
+    setPage(1);
+  };
+
+  // Compute camera counts per state dynamically
+  const stateCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const cam of cameras) {
+      if (cam.stateCode) {
+        counts[cam.stateCode] = (counts[cam.stateCode] || 0) + 1;
+      }
+    }
+    return counts;
+  }, [cameras]);
+
+  // Sorted list of all active states with counts
+  const availableStates = useMemo(() => {
+    return Object.keys(stateCounts)
+      .map((code) => ({
+        code,
+        name: US_STATES[code] || code,
+        count: stateCounts[code] || 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [stateCounts]);
+
+  // Compute counts per source
+  const sourceCounts = useMemo(() => {
+    let ww = 0;
+    let ro = 0;
+    let db = 0;
+    for (const c of cameras) {
+      if (c.source === 'WEATHER_WISE') ww++;
+      else if (c.source === 'RADAR_OMEGA') ro++;
+      else if (c.source === 'DATABASE') db++;
+    }
+    return {
+      ww,
+      ro,
+      db,
+      total: cameras.length,
+      favs: favoriteIds.size,
+    };
+  }, [cameras, favoriteIds]);
+
+  // Compute filtered cameras
+  const filteredCameras = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return cameras.filter((cam) => {
+      if (sourceFilter === 'FAVORITES') {
+        if (!favoriteIds.has(cam.id)) return false;
+      } else if (sourceFilter !== 'ALL') {
+        if (cam.source !== sourceFilter) return false;
+      }
+
+      if (selectedState && cam.stateCode?.toUpperCase() !== selectedState.toUpperCase()) {
+        return false;
+      }
+
+      if (!q) return true;
+      return (
+        cam.name.toLowerCase().includes(q) ||
+        cam.cleanName.toLowerCase().includes(q) ||
+        cam.location.toLowerCase().includes(q) ||
+        cam.source.toLowerCase().includes(q) ||
+        cam.stateCode.toLowerCase().includes(q)
+      );
+    });
+  }, [cameras, searchQuery, sourceFilter, selectedState, favoriteIds]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredCameras.length / ITEMS_PER_PAGE));
+  const currentPage = Math.min(page, totalPages);
+
+  const paginatedList = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredCameras.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredCameras, currentPage]);
+
+  const resetAllFilters = () => {
+    setSearchQuery('');
+    setSourceFilter('ALL');
+    setSelectedState('');
+    setPage(1);
+  };
+
+  const hasActiveFilters = searchQuery !== '' || sourceFilter !== 'ALL' || selectedState !== '';
+
+  return (
+    <aside className={`flex flex-col bg-[#000000] border-r border-neutral-800 h-full select-none ${className}`}>
+      {/* Top Header & Search */}
+      <div className="p-3.5 border-b border-neutral-800 space-y-3 bg-[#050505]">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-white tracking-wide uppercase flex items-center gap-2">
+            <Radio className="w-3.5 h-3.5 text-neutral-400" />
+            Camera Feeds
+          </span>
+          <div className="flex items-center gap-1.5">
+            {hasActiveFilters && (
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={resetAllFilters}
+                className="px-2 py-0.5 rounded-md bg-neutral-900 hover:bg-neutral-800 text-neutral-300 text-[10px] flex items-center gap-1 transition-colors cursor-pointer border border-neutral-800 font-medium"
+                title="Reset all filters"
+              >
+                <RotateCcw className="w-2.5 h-2.5 text-blue-400" />
+                <span>Reset</span>
+              </motion.button>
+            )}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onRandomFeed}
+              className="px-2.5 py-1 rounded-md bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white text-[10px] flex items-center gap-1.5 transition-all cursor-pointer font-semibold shadow-sm"
+              title="Jump to Random Live Camera Feed"
+            >
+              <Shuffle className="w-3 h-3 text-blue-400" />
+              <span>Surprise</span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-neutral-500" />
+          <input
+            type="text"
+            placeholder="Search city, highway, chaser..."
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(1);
+            }}
+            className="w-full pl-8 pr-7 py-2 bg-[#0a0a0a] border border-neutral-800 rounded-lg text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-500 transition-colors"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => {
+                setSearchQuery('');
+                setPage(1);
+              }}
+              className="absolute right-2 top-2.5 text-neutral-400 hover:text-white cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+
+        {/* SECTION 1: FILTER BY SOURCE */}
+        <div>
+          <div className="flex items-center justify-between text-[10px] text-neutral-400 font-bold mb-1.5 tracking-wider uppercase">
+            <span className="flex items-center gap-1.5">
+              <Layers className="w-3 h-3 text-blue-400" />
+              Filter by Source
+            </span>
+            <span className="text-neutral-500 font-normal">
+              {sourceFilter === 'ALL'
+                ? 'All Sources'
+                : sourceFilter === 'RADAR_OMEGA'
+                ? 'Radar Omega'
+                : sourceFilter === 'WEATHER_WISE'
+                ? 'Weather Wise'
+                : sourceFilter === 'DATABASE'
+                ? 'Traffic DOT'
+                : 'Starred'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-1.5 text-[10px]">
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setSourceFilter('ALL');
+                setPage(1);
+              }}
+              className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                sourceFilter === 'ALL'
+                  ? 'bg-white text-black border-white font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              <span>All Sources</span>
+              <span className="opacity-75 font-mono">{sourceCounts.total.toLocaleString()}</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setSourceFilter('RADAR_OMEGA');
+                setPage(1);
+              }}
+              className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                sourceFilter === 'RADAR_OMEGA'
+                  ? 'bg-white text-black border-white font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Radio className="w-2.5 h-2.5 text-blue-400" />
+                Radar Omega
+              </span>
+              <span className="opacity-75 font-mono">{sourceCounts.ro}</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setSourceFilter('WEATHER_WISE');
+                setPage(1);
+              }}
+              className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                sourceFilter === 'WEATHER_WISE'
+                  ? 'bg-white text-black border-white font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
+                Weather Wise
+              </span>
+              <span className="opacity-75 font-mono">{sourceCounts.ww}</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setSourceFilter('DATABASE');
+                setPage(1);
+              }}
+              className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer ${
+                sourceFilter === 'DATABASE'
+                  ? 'bg-white text-black border-white font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Car className="w-2.5 h-2.5 text-neutral-400" />
+                Traffic DOT
+              </span>
+              <span className="opacity-75 font-mono">{sourceCounts.db.toLocaleString()}</span>
+            </motion.button>
+          </div>
+        </div>
+
+        {/* SECTION 2: FILTER BY STATE */}
+        <div>
+          <div className="flex items-center justify-between text-[10px] text-neutral-400 font-bold mb-1.5 tracking-wider uppercase">
+            <span className="flex items-center gap-1.5">
+              <MapPin className="w-3 h-3 text-blue-400" />
+              Filter by State
+            </span>
+            {selectedState && (
+              <button
+                onClick={() => setSelectedState('')}
+                className="text-[9px] text-blue-400 hover:underline cursor-pointer"
+              >
+                Clear State ({selectedState})
+              </button>
+            )}
+          </div>
+
+          {/* Quick State Pills */}
+          <div className="flex flex-wrap gap-1 mb-1.5">
+            <motion.button
+              whileTap={{ scale: 0.94 }}
+              onClick={() => setSelectedState('')}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                !selectedState
+                  ? 'bg-white text-black border-white shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              All States
+            </motion.button>
+            {POPULAR_QUICK_STATES.map((code) => {
+              const count = stateCounts[code] || 0;
+              const isSelected = selectedState.toUpperCase() === code;
+              return (
+                <motion.button
+                  whileTap={{ scale: 0.94 }}
+                  key={code}
+                  onClick={() => setSelectedState(isSelected ? '' : code)}
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer flex items-center gap-0.5 ${
+                    isSelected
+                      ? 'bg-white text-black border-white shadow-sm'
+                      : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                  title={`${US_STATES[code] || code} (${count.toLocaleString()} cameras)`}
+                >
+                  <span>{code}</span>
+                  {isSelected && <span className="w-1 h-1 rounded-full bg-blue-500 ml-0.5" />}
+                </motion.button>
+              );
+            })}
+          </div>
+
+          {/* Full State Dropdown with Counts */}
+          <div className="relative">
+            <select
+              value={selectedState}
+              onChange={(e) => setSelectedState(e.target.value)}
+              className="w-full bg-[#0a0a0a] border border-neutral-800 rounded-lg px-2.5 py-1.5 text-[11px] text-white focus:outline-none focus:border-neutral-500 cursor-pointer font-medium"
+            >
+              <option value="" className="bg-black text-white">
+                All US States & Territories ({cameras.length.toLocaleString()})
+              </option>
+              {availableStates.map((st) => (
+                <option key={st.code} value={st.code} className="bg-black text-white">
+                  {st.name} ({st.code}) — {st.count.toLocaleString()} feeds
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </div>
+
+      {/* Results Header with Page controls */}
+      <div className="px-3.5 py-2 bg-black border-b border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
+        <div className="flex items-center gap-2 truncate">
+          <span className="font-medium">
+            MATCHING: <span className="text-white font-bold font-mono">{filteredCameras.length.toLocaleString()}</span>
+          </span>
+          {selectedState && (
+            <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-blue-300 text-[10px] font-bold">
+              {selectedState}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0">
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage <= 1}
+            className="p-1 rounded hover:bg-neutral-900 disabled:opacity-30 cursor-pointer text-neutral-300"
+            title="Previous Page"
+          >
+            <ChevronLeft className="w-3.5 h-3.5" />
+          </motion.button>
+          <span className="text-[10px] text-neutral-400 font-mono">
+            {currentPage}/{totalPages}
+          </span>
+          <motion.button
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage >= totalPages}
+            className="p-1 rounded hover:bg-neutral-900 disabled:opacity-30 cursor-pointer text-neutral-300"
+            title="Next Page"
+          >
+            <ChevronRight className="w-3.5 h-3.5" />
+          </motion.button>
+        </div>
+      </div>
+
+      {/* Scrollable Camera List */}
+      <div className="flex-1 overflow-y-auto divide-y divide-neutral-900 p-1.5 space-y-0.5">
+        {paginatedList.length === 0 ? (
+          <div className="py-12 px-4 text-center text-neutral-500 text-xs">
+            <Filter className="w-8 h-8 mx-auto mb-2 opacity-30 text-white" />
+            <p className="text-neutral-200 font-bold mb-1">No camera feeds found</p>
+            <p className="text-[11px] text-neutral-500 mb-3">
+              No feeds match the selected state ({selectedState || 'Any'}) and source ({sourceFilter}).
+            </p>
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={resetAllFilters}
+              className="px-3.5 py-1.5 rounded-lg bg-white text-black font-bold text-xs hover:bg-neutral-200 cursor-pointer"
+            >
+              Reset Filters
+            </motion.button>
+          </div>
+        ) : (
+          paginatedList.map((cam) => {
+            const isSelected = selectedCamera?.id === cam.id;
+            const isFav = favoriteIds.has(cam.id);
+
+            return (
+              <motion.div
+                whileHover={{ x: 2 }}
+                key={cam.id}
+                onClick={() => onSelectCamera(cam)}
+                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 group relative ${
+                  isSelected
+                    ? 'bg-neutral-900 border border-neutral-700 shadow-sm'
+                    : 'hover:bg-neutral-950 border border-transparent hover:border-neutral-800'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                      {cam.source === 'RADAR_OMEGA' ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-800 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Radio className="w-2.5 h-2.5 text-blue-400" />
+                          Radar Omega
+                        </span>
+                      ) : cam.source === 'WEATHER_WISE' ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-white font-bold uppercase tracking-wider flex items-center gap-1">
+                          <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
+                          Weather Wise
+                        </span>
+                      ) : (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-950 border border-neutral-800 text-neutral-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                          <Car className="w-2.5 h-2.5 text-neutral-400" />
+                          Traffic DOT
+                        </span>
+                      )}
+                      {cam.stateCode && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-white font-bold">
+                          {cam.stateCode}
+                        </span>
+                      )}
+                      {isSelected && (
+                        <span className="text-[9px] text-white font-bold flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6] inline-block" />
+                          ACTIVE
+                        </span>
+                      )}
+                    </div>
+                    <p
+                      className={`text-xs font-semibold truncate ${
+                        isSelected ? 'text-white' : 'text-neutral-200 group-hover:text-white'
+                      }`}
+                      title={cam.name}
+                    >
+                      {cam.cleanName}
+                    </p>
+                    <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 truncate">
+                      <span className="truncate">{cam.location}</span>
+                      <span>•</span>
+                      <span className="text-neutral-500 font-mono text-[9px] shrink-0">
+                        {cam.source === 'RADAR_OMEGA'
+                          ? 'Source: Radar Omega'
+                          : cam.source === 'WEATHER_WISE'
+                          ? 'Source: Weather Wise'
+                          : 'Source: State DOT'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
+                    <motion.button
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.85 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onToggleFavorite(cam.id);
+                      }}
+                      className={`p-1.5 rounded hover:bg-neutral-800 transition-colors cursor-pointer ${
+                        isFav ? 'text-blue-400' : 'text-neutral-600 hover:text-neutral-300'
+                      }`}
+                      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                    >
+                      <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-blue-400 text-blue-400' : ''}`} />
+                    </motion.button>
+
+                    <motion.button
+                      whileHover={{ scale: 1.15 }}
+                      whileTap={{ scale: 0.85 }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onAddToGrid(cam);
+                      }}
+                      className="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer border border-neutral-800"
+                      title="Add to Multi-View Wall"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </motion.button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5 font-mono">
+                  <span>
+                    {cam.coordinates[1].toFixed(2)}°, {cam.coordinates[0].toFixed(2)}°
+                  </span>
+                  <span className="text-neutral-400">
+                    LIVE
+                  </span>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Pagination Footer */}
+      <div className="p-2.5 border-t border-neutral-800 bg-[#050505] flex items-center justify-between text-xs text-neutral-400">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setPage((p) => Math.max(1, p - 1))}
+          disabled={currentPage <= 1}
+          className="px-2.5 py-1 rounded-md bg-neutral-900 text-neutral-300 hover:text-white disabled:opacity-30 cursor-pointer text-[11px] border border-neutral-800 font-medium"
+        >
+          Prev
+        </motion.button>
+        <span className="text-[11px] text-white font-mono">
+          Page {currentPage} of {totalPages}
+        </span>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+          disabled={currentPage >= totalPages}
+          className="px-2.5 py-1 rounded-md bg-neutral-900 text-neutral-300 hover:text-white disabled:opacity-30 cursor-pointer text-[11px] border border-neutral-800 font-medium"
+        >
+          Next
+        </motion.button>
+      </div>
+    </aside>
+  );
+};
