@@ -306,6 +306,18 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                  {/* Remove Camera */}
+                  <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onUpdateSlot(idx, null);
+                    }}
+                    className="p-1 rounded-md bg-black/90 border border-neutral-800 text-neutral-400 hover:text-red-500 hover:border-red-900 transition-all cursor-pointer"
+                    title="Remove Camera"
+                  >
+                    <X className="w-3 h-3" />
+                  </motion.button>
                   {/* Solo Audio */}
                   <motion.button
                     whileTap={{ scale: 0.9 }}
