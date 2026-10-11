@@ -194,8 +194,8 @@ export default function App() {
         <div
           className={`h-full transition-all duration-300 ease-in-out shrink-0 ${
             isSidebarOpen
-              ? 'w-full sm:w-80 md:w-96 fixed inset-y-14 left-0 z-40 lg:static lg:inset-auto'
-              : 'w-0 overflow-hidden hidden'
+              ? 'w-full sm:w-80 md:w-96 fixed sm:static inset-y-14 left-0 z-40'
+              : 'w-16 hidden sm:block'
           }`}
         >
           <Sidebar
@@ -213,6 +213,8 @@ export default function App() {
             onToggleFavorite={handleToggleFav}
             favoriteIds={favoriteIds}
             onRandomFeed={handleRandomFeed}
+            isOpen={isSidebarOpen}
+            onClose={() => setIsSidebarOpen((v) => !v)}
             className="w-full h-full"
           />
         </div>

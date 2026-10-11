@@ -161,6 +161,9 @@ function parseLocationDetails(name: string): { cleanName: string; location: stri
     }
   }
 
+  // Remove any remaining parenthetical location text from cleanName
+  cleanName = cleanName.replace(/\s*\([^)]*\)/g, '').trim();
+
   // 2. If no state code yet, test against full state names or two-letter code in text
   if (!stateCode) {
     for (const [code, fullName] of Object.entries(US_STATES)) {
@@ -173,6 +176,18 @@ function parseLocationDetails(name: string): { cleanName: string; location: stri
         break;
       }
     }
+  }
+
+  // If cleanName contains trailing location after dash (e.g. "Stoddard Co EMA - Essex, MO"), strip it so location doesn't duplicate
+  if (stateCode) {
+    const stateName = US_STATES[stateCode] || '';
+    cleanName = cleanName.replace(new RegExp(`\\s*[-–—]\\s*[^,]+,\\s*(${stateCode}|${stateName})$`, 'i'), '').trim();
+    cleanName = cleanName.replace(new RegExp(`\\s*[-–—]\\s*(${stateCode}|${stateName})$`, 'i'), '').trim();
+  }
+
+  cleanName = cleanName.replace(/[-–—]\s*$/, '').trim();
+  if (!cleanName) {
+    cleanName = name.replace(/\s*\([^)]*\)/g, '').trim() || name;
   }
 
   return { cleanName, location, stateCode };

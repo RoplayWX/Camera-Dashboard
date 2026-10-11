@@ -34,6 +34,8 @@ interface SidebarProps {
   className?: string;
   selectedState?: string;
   onSelectState?: (state: string) => void;
+  onClose?: () => void;
+  isOpen?: boolean;
 }
 
 const ITEMS_PER_PAGE = 40;
@@ -51,6 +53,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   className = '',
   selectedState: externalSelectedState,
   onSelectState: externalOnSelectState,
+  onClose,
+  isOpen = true,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sourceFilter, setSourceFilter] = useState<CameraSourceFilter>('ALL');
@@ -148,15 +152,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const hasActiveFilters = searchQuery !== '' || sourceFilter !== 'ALL' || selectedState !== '';
 
+  if (!isOpen) {
+    return (
+      <aside className={`flex flex-col items-center py-4 bg-[#000000] border-r border-neutral-800 h-full select-none gap-4 ${className}`}>
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={onClose}
+          className="p-2 rounded-xl bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer border border-neutral-800 shadow-lg"
+          title="Expand Sidebar"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </motion.button>
+        <div className="w-8 h-[1px] bg-neutral-800 my-1" />
+        <button
+          onClick={onClose}
+          className="p-2.5 rounded-xl bg-neutral-900/50 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer relative"
+          title="Camera Feeds"
+        >
+          <Radio className="w-4 h-4 text-blue-500" />
+          <span className="absolute -top-1 -right-1 px-1.5 py-0.5 text-[8px] font-bold bg-blue-600 text-white rounded-full">
+            {cameras.length}
+          </span>
+        </button>
+        <button
+          onClick={onRandomFeed}
+          className="p-2.5 rounded-xl bg-neutral-900/50 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          title="Random Feed"
+        >
+          <Shuffle className="w-4 h-4 text-neutral-400" />
+        </button>
+      </aside>
+    );
+  }
+
   return (
     <aside className={`flex flex-col bg-[#000000] border-r border-neutral-800 h-full select-none ${className}`}>
       {/* Top Header & Search */}
       <div className="p-3.5 border-b border-neutral-800 space-y-3 bg-[#050505]">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-white tracking-wide uppercase flex items-center gap-2">
-            <Radio className="w-3.5 h-3.5 text-neutral-400" />
-            Camera Feeds
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-white tracking-wide uppercase flex items-center gap-2">
+              <Radio className="w-3.5 h-3.5 text-neutral-400" />
+              Camera Feeds
+            </span>
+            {onClose && (
+              <motion.button
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+                onClick={onClose}
+                className="p-1 rounded-md bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors cursor-pointer border border-neutral-800"
+                title="Collapse Sidebar"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" />
+              </motion.button>
+            )}
+          </div>
           <div className="flex items-center gap-1.5">
             {hasActiveFilters && (
               <motion.button
@@ -300,6 +351,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 Traffic Cameras
               </span>
               <span className="opacity-75 font-mono">{sourceCounts.db.toLocaleString()}</span>
+            </motion.button>
+
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => {
+                setSourceFilter('FAVORITES');
+                setPage(1);
+              }}
+              className={`py-1.5 px-2 rounded-lg border text-left flex items-center justify-between transition-all cursor-pointer col-span-2 ${
+                sourceFilter === 'FAVORITES'
+                  ? 'bg-white text-black border-white font-bold shadow-sm'
+                  : 'bg-neutral-950 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              <span className="flex items-center gap-1">
+                <Star className={`w-2.5 h-2.5 ${sourceFilter === 'FAVORITES' ? 'fill-black text-black' : 'text-blue-400 fill-blue-400'}`} />
+                Starred / Favorites
+              </span>
+              <span className="opacity-75 font-mono">{sourceCounts.favs}</span>
             </motion.button>
           </div>
         </div>
@@ -459,7 +529,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 }`}
                 title="Click to focus or drag onto wall slots"
               >
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 mb-1 flex-wrap">
                       <div
@@ -504,19 +574,33 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       {cam.cleanName}
                     </p>
-                    <div className="flex items-center gap-1.5 text-[10px] text-neutral-400 truncate">
-                      <span className="truncate">{cam.location}</span>
-                      <span>•</span>
-                      <span className="text-neutral-500 font-mono text-[9px] shrink-0">
-                        {cam.source === 'RADAR_OMEGA'
-                          ? 'Source: RadarOmega'
-                          : cam.source === 'WEATHER_WISE'
-                          ? 'Source: WeatherWise'
-                          : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
-                          ? 'Source: Max Velocity (WeatherFront)'
-                          : 'Source: Traffic DOT'}
-                      </span>
-                    </div>
+                    {(() => {
+                      const cityPart = cam.location ? cam.location.split(',')[0].trim().toLowerCase() : '';
+                      const cleanLower = cam.cleanName ? cam.cleanName.toLowerCase().trim() : '';
+                      const isCityOnlyName = !cam.location || cam.location === 'United States' || cleanLower === cityPart || cleanLower === (cam.location ? cam.location.toLowerCase() : '');
+                      
+                      const sourceText = cam.source === 'RADAR_OMEGA'
+                        ? 'Source: RadarOmega'
+                        : cam.source === 'WEATHER_WISE'
+                        ? 'Source: WeatherWise'
+                        : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
+                        ? 'Source: WeatherFront'
+                        : 'Source: Traffic DOT';
+
+                      return (
+                        <div className="flex items-center text-[10px] text-neutral-400 truncate gap-1.5 leading-none mt-3.5">
+                          {!isCityOnlyName && (
+                            <>
+                              <span className="truncate">{cam.location}</span>
+                              <span className="text-neutral-600">•</span>
+                            </>
+                          )}
+                          <span className="text-neutral-500 font-mono text-[9px] shrink-0">
+                            {sourceText}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0 pt-0.5">
