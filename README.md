@@ -56,9 +56,36 @@ Camera Dashboard is intended for weather monitoring and informational purposes. 
 
 **Always rely on official National Weather Service alerts and local emergency management instructions for weather-related safety decisions.** Never use this dashboard as your sole source of emergency information.
 
-## 📄 License
+## 📄 License & Credits
 
-No license is specified in this README. Check the repository for an existing license before reusing, modifying, or redistributing this project.
+### 📹 Camera & Data Providers
+
+Camera Dashboard displays or links to camera feeds and weather-related resources made available by third-party providers. We appreciate the organizations and developers who make these resources accessible.
+
+**Camera feeds & live traffic cameras**
+- [HazCams](https://www.hazcams.com/) — Live camera feeds.
+- State Department of Transportation (DOT) and 511 traffic camera services — Camera feeds from participating states and transportation agencies.
+
+**Weather radar & monitoring platforms**
+- [RadarOmega](https://www.radaromega.com/)
+- [WeatherFront](https://weatherfront.app/)
+- [WeatherWise](https://weatherwise.app/)
+
+These providers and their respective owners retain ownership of their original content, software, trademarks, and media. Their inclusion in Camera Dashboard does not imply sponsorship, partnership, or endorsement.
+
+### 🗺️ State DOT & 511 Services
+
+Camera Dashboard may incorporate camera feeds from multiple state transportation departments and 511 traveler-information services. These feeds remain subject to the respective agencies' terms of use and attribution requirements.
+
+Additional providers may be credited as they are identified.
+
+### ⚖️ Usage & Licensing
+
+Camera Dashboard is an independent project. Unless explicitly stated otherwise, it is not affiliated with, endorsed by, or officially associated with the third-party providers listed above.
+
+Crediting a provider does not imply permission to redistribute or reuse its footage, imagery, or other content. All third-party content remains subject to its owner's applicable terms and licensing conditions.
+
+The license for Camera Dashboard's own source code, if specified in the repository, applies separately from the rights governing third-party content.
 
 ---
 
