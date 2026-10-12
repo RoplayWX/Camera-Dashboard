@@ -56,45 +56,65 @@ Camera Dashboard is intended for weather monitoring and informational purposes. 
 
 **Always rely on official National Weather Service alerts and local emergency management instructions for weather-related safety decisions.** Never use this dashboard as your sole source of emergency information.
 
-## 📄 License & Credits
+## 📄 Credits, Attribution & Third-Party Content
 
 ### 📹 Camera & Data Providers
 
-Camera Dashboard displays or links to camera feeds and weather-related resources made available by third-party providers. We appreciate the organizations and developers who make these resources accessible.
+Camera Dashboard brings together weather-monitoring resources and camera feeds from third-party providers. We appreciate the original organizations, agencies, developers, and camera operators who make these resources available.
 
 **Camera feeds & live traffic cameras**
-- [HazCams](https://www.hazcams.com/) — Live camera feeds.
-- State Department of Transportation (DOT) and 511 traffic camera services — Camera feeds from participating states and transportation agencies.
+- [HazCams](https://www.hazcams.com/) — Camera feeds.
+- State Departments of Transportation (DOT) and 511 traveler-information services — Camera feeds provided by participating transportation agencies.
 
 **Weather radar & monitoring platforms**
 - [RadarOmega](https://www.radaromega.com/)
 - [WeatherFront](https://weatherfront.com/)
-- [WeatherWise](https://weatherwise.app/)
+- [WeatherWise](https://www.weatherwise.app/)
 
-These providers and their respective owners retain ownership of their original content, software, trademarks, and media. Their inclusion in Camera Dashboard does not imply sponsorship, partnership, or endorsement.
+Additional camera operators and transportation agencies may contribute feeds displayed within the dashboard. Where possible, individual feeds are identified with provider labels, and provider attribution is retained on supported widgets and snapshots.
+
+### ©️ Copyright & Ownership
+
+All third-party names, trademarks, software, camera footage, radar imagery, and other media remain the property of their respective owners or rights holders.
+
+Camera Dashboard does not claim ownership of third-party content displayed through the application. Provider names and links are included for identification and attribution purposes only.
+
+The inclusion of a provider or its content does not imply sponsorship, partnership, endorsement, or authorization by that provider.
+
+### ⚖️ Third-Party Terms & Permissions
+
+Third-party feeds, imagery, and services may be subject to separate licences, terms of use, access restrictions, and attribution requirements.
+
+Providing attribution does not itself grant permission to reproduce, redistribute, rebroadcast, download, or publicly display third-party content. The applicable terms and permissions must be respected for each source.
+
+Camera Dashboard is an independent project and is not officially affiliated with the third-party providers listed above unless explicitly stated.
 
 ### 🗺️ State DOT & 511 Services
 
-Camera Dashboard may incorporate camera feeds from multiple state transportation departments and 511 traveler-information services. These feeds remain subject to the respective agencies' terms of use and attribution requirements.
+Camera Dashboard may display camera feeds originating from state transportation departments and 511 traveler-information services.
 
-Additional providers may be credited as they are identified.
+Each agency retains its applicable rights in its own materials. Feed availability and permitted uses may vary by agency and source. Individual agencies should be consulted for their current terms and attribution requirements.
 
-### ⚖️ Usage & Licensing
+### 💚 Non-Commercial Project
 
-Camera Dashboard is an independent project. Unless explicitly stated otherwise, it is not affiliated with, endorsed by, or officially associated with the third-party providers listed above.
+Camera Dashboard is an independently developed hobby project intended for personal weather monitoring and informational use.
 
-Crediting a provider does not imply permission to redistribute or reuse its footage, imagery, or other content. All third-party content remains subject to its owner's applicable terms and licensing conditions.
+- **No revenue:** The project does not generate revenue.
+- **No monetization:** No advertisements or paid access are intentionally used to generate income for the project.
+- **Free access:** Users are not charged by the project to access the dashboard.
+- **No sale of third-party content:** The project does not sell access to the camera feeds, radar imagery, or other third-party materials it displays.
 
-The license for Camera Dashboard's own source code, if specified in the repository, applies separately from the rights governing third-party content.
+The project is maintained for personal interest and to provide a convenient interface for weather-monitoring resources.
 
-## 💚 Non-Commercial Project
+Its non-commercial nature does not override third-party licences, terms of use, or redistribution restrictions.
 
-Camera Dashboard is a personal, non-commercial project created for weather monitoring and public informational use.
+### 🧾 Source Code License
 
-- **No Profit:** No profit or revenue is generated from this application.
-- **No Monetization:** The application is not operated for commercial gain and is not intended to generate income.
-- **No Payments Collected:** Users are not charged to access the dashboard, and no payments are collected by the project.
-- **No Paid Content:** The project does not sell access to camera feeds, radar imagery, weather information, or other displayed resources.
+No separate open-source licence is declared in this section. Unless a licence is added to the repository, do not assume that the project's source code is licensed for unrestricted reuse or redistribution.
+
+The rights governing Camera Dashboard's original source code are separate from the rights governing third-party content and services.
+
+---
 
 Camera Dashboard is developed and maintained as a hobby project, with the goal of bringing useful weather-monitoring resources together in one convenient place.
 
