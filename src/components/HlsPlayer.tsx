@@ -155,7 +155,9 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     try {
       if (video.seekable && video.seekable.length > 0) {
         const liveTip = video.seekable.end(video.seekable.length - 1);
-        video.currentTime = Math.max(0, liveTip - 2.5);
+        if (liveTip > 5) {
+          video.currentTime = Math.max(0, liveTip - 2.0);
+        }
       }
     } catch {
       // Ignore
@@ -194,60 +196,72 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
     const canPlayNative = video.canPlayType('application/vnd.apple.mpegurl');
 
     if (isHlsSupported) {
-
       const hls = new Hls({
-        enableWorker: true,
+        enableWorker: false, // In-thread demuxing prevents iframe Web Worker stalls and audio buffer blocking
         lowLatencyMode: false,
-        maxBufferLength: 30,
-        // Increased timeouts to debug "connecting" hang
-        manifestLoadingTimeOut: 30000,
-        fragLoadingTimeOut: 30000,
-        liveSyncDurationCount: 4,
+        maxBufferLength: compact ? 8 : 20,
+        maxMaxBufferLength: compact ? 16 : 40,
+        backBufferLength: compact ? 0 : 5,
+        maxBufferSize: compact ? 8 * 1024 * 1024 : 35 * 1024 * 1024,
+        manifestLoadingTimeOut: 20000,
+        fragLoadingTimeOut: 25000,
+        liveSyncDurationCount: 3,
         liveMaxLatencyDurationCount: 8,
-        maxMaxBufferLength: 60,
-        backBufferLength: 15,
         manifestLoadingMaxRetry: 4,
+        fragLoadingMaxRetry: 4,
         enableSoftwareAES: true,
-        stretchShortVideoTrack: true,
-        maxAudioFramesDrift: 2,
         xhrSetup: (xhr) => {
           xhr.withCredentials = false;
-        },
-        loader: class ProxyLoader extends Hls.DefaultConfig.loader {
-          load(context: any, config: any, callbacks: any) {
-            super.load(context, config, callbacks);
-          }
         },
       });
 
       hlsRef.current = hls;
 
-      // Add debug logging
-      Object.values(Hls.Events).forEach((event) => {
-        hls.on(event, (evt, data) => {
-          console.log(`HLS Event: ${evt}`, data);
-        });
-      });
-
       hls.attachMedia(video);
-      const streamUrl = camera.streamUrl;
+      let streamUrl = camera.streamUrl;
+      const isHazCam =
+        camera.source === 'HAZCAMS' ||
+        camera.source === 'HazCams' ||
+        (camera.streamUrl && camera.streamUrl.includes('hazcams.com'));
       hls.loadSource(streamUrl);
-      video.load();
 
       hls.on(Hls.Events.MANIFEST_PARSED, (_, data) => {
         setIsLoading(false);
-        if (autoPlay) {
-          video.play().catch(() => {
-            video.muted = true;
-            setIsMuted(true);
-            video.play().catch(() => {});
-          });
-        }
         if (data.levels && data.levels.length > 0) {
           const l = data.levels[0];
           setResolution(`${l.width}x${l.height}`);
         }
-        jumpToLiveEdge();
+        if (autoPlay) {
+          const playPromise = video.play();
+          if (playPromise !== undefined) {
+            playPromise
+              .then(() => {
+                setIsLoading(false);
+                setIsPlaying(true);
+              })
+              .catch(() => {
+                // Auto-fallback: mute and play if browser autoplay policy blocks audio
+                video.muted = true;
+                setIsMuted(true);
+                video.play()
+                  .then(() => {
+                    setIsLoading(false);
+                    setIsPlaying(true);
+                  })
+                  .catch(() => {
+                    setIsLoading(false);
+                  });
+              });
+          }
+        }
+      });
+
+      hls.on(Hls.Events.FRAG_BUFFERED, () => {
+        setIsLoading(false);
+      });
+
+      hls.on(Hls.Events.FRAG_LOADED, () => {
+        setIsLoading(false);
       });
 
       hls.on(Hls.Events.LEVEL_SWITCHED, (_, data) => {
@@ -258,26 +272,45 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
       });
 
       let networkRetries = 0;
+      let usedProxyFallback = false;
       hls.on(Hls.Events.ERROR, (_, data) => {
         if (data.fatal) {
           switch (data.type) {
             case Hls.ErrorTypes.NETWORK_ERROR: {
               const code = data.response?.code || (data.response as any)?.status;
               networkRetries++;
-              if ((code && code >= 400 && code < 500) || networkRetries > 3) {
+
+              // Automatic fallback to server-side stream proxy on 403 or network errors
+              if (!usedProxyFallback && !streamUrl.includes('/api/proxy-stream')) {
+                usedProxyFallback = true;
+                streamUrl = `/api/proxy-stream?url=${encodeURIComponent(camera.streamUrl)}`;
+                hls.loadSource(streamUrl);
+                hls.startLoad();
+                return;
+              }
+
+              if ((code && code >= 400 && code < 500) || networkRetries > 4) {
                 setHasError(true);
-                setErrorMessage(code ? `Signal inaccessible (HTTP ${code})` : 'Feed refused connection / offline');
+                setErrorMessage(code ? `Station offline or not found (HTTP ${code})` : 'Feed refused connection / offline');
                 setIsLoading(false);
                 hls.destroy();
                 hlsRef.current = null;
-                onInaccessible?.(camera.id);
+                if (!isHazCam) {
+                  onInaccessible?.(camera.id);
+                }
                 return;
               }
               hls.startLoad();
               break;
             }
             case Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
+              networkRetries++;
+              if (networkRetries > 3) {
+                hls.swapAudioCodec();
+                hls.recoverMediaError();
+              } else {
+                hls.recoverMediaError();
+              }
               break;
             default:
               setHasError(true);
@@ -285,8 +318,14 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               setIsLoading(false);
               hls.destroy();
               hlsRef.current = null;
-              onInaccessible?.(camera.id);
+              if (!isHazCam) {
+                onInaccessible?.(camera.id);
+              }
               break;
+          }
+        } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
+          if (video && video.paused) {
+            video.play().catch(() => {});
           }
         }
       });
@@ -318,6 +357,12 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
+      const video = videoRef.current;
+      if (video) {
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+      }
     };
   }, [setupStream]);
 
@@ -346,79 +391,69 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
           video.playbackRate = 1.0;
         }
       }
-    }, 2000);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [isPlaying]);
 
-  // Real-time Ambient Lighting Frame Sampler
+  // Ambient Lighting: Low-overhead sampler (completely skipped in compact/grid mode)
   useEffect(() => {
-    if (!isAmbientEnabled) {
+    if (!isAmbientEnabled || compact) {
       return;
     }
 
-    const canvas = ambientCanvasRef.current;
-    if (!canvas) return;
+    const initialColor = getAtmosphericDefault(camera);
+    setAmbientRgb(initialColor);
+    if (onAmbientColorChange) onAmbientColorChange(initialColor);
 
-    let animId: number;
-    let lastSampleTime = 0;
+    // Sample gently once every 4s to eliminate CPU/GPU readback stalls and render thrashing
+    const interval = setInterval(() => {
+      const targetElement = isImageStream ? imageRef.current : videoRef.current;
+      const canvas = ambientCanvasRef.current;
+      if (!targetElement || !canvas) return;
 
-    const sampleLoop = (now: number) => {
-      // Sample at ~20fps for silky smooth ambient responsiveness
-      if (now - lastSampleTime > 50) {
-        lastSampleTime = now;
-        const targetElement = isImageStream ? imageRef.current : videoRef.current;
-        if (!targetElement) return;
+      const isReady = isImageStream
+        ? Boolean(imageRef.current?.complete && (imageRef.current?.naturalWidth || 0) > 0)
+        : Boolean(videoRef.current && videoRef.current.readyState >= 2 && !videoRef.current.paused);
 
-        const isReady = isImageStream
-          ? Boolean(imageRef.current?.complete && imageRef.current?.naturalWidth > 0)
-          : Boolean(videoRef.current && videoRef.current.readyState >= 2 && !videoRef.current.paused && !videoRef.current.ended);
+      if (!isReady) return;
 
-        if (isReady) {
-          const ctx = canvas.getContext('2d', { willReadFrequently: true });
-          if (ctx) {
-            try {
-              ctx.drawImage(targetElement, 0, 0, canvas.width, canvas.height);
-              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-              const d = imgData.data;
-              let r = 0, g = 0, b = 0, count = 0;
-              for (let i = 0; i < d.length; i += 16) {
-                const pr = d[i], pg = d[i + 1], pb = d[i + 2];
-                // Filter out pitch-black pillarbox borders
-                if (pr > 15 || pg > 15 || pb > 15) {
-                  r += pr;
-                  g += pg;
-                  b += pb;
-                  count++;
-                }
-              }
-              if (count > 0) {
-                const avgR = Math.min(255, Math.round((r / count) * 1.3));
-                const avgG = Math.min(255, Math.round((g / count) * 1.3));
-                const avgB = Math.min(255, Math.round((b / count) * 1.3));
-                if (Math.max(avgR, avgG, avgB) > 20) {
-                  const colorStr = `${avgR}, ${avgG}, ${avgB}`;
-                  setAmbientRgb(colorStr);
-                  if (onAmbientColorChange) onAmbientColorChange(colorStr);
-                }
-              }
-            } catch {
-              // Canvas tainted by cross-origin stream:
-              // The canvas still paints live video frames visually with CSS blur!
-              // In addition, ensure ambientRgb has the atmospheric color
-              const fallback = getAtmosphericDefault(camera);
-              setAmbientRgb(fallback);
-              if (onAmbientColorChange) onAmbientColorChange(fallback);
-            }
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return;
+
+      try {
+        ctx.drawImage(targetElement, 0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const d = imgData.data;
+        let r = 0, g = 0, b = 0, count = 0;
+        for (let i = 0; i < d.length; i += 32) {
+          const pr = d[i], pg = d[i + 1], pb = d[i + 2];
+          if (pr > 15 || pg > 15 || pb > 15) {
+            r += pr;
+            g += pg;
+            b += pb;
+            count++;
           }
         }
+        if (count > 0) {
+          const avgR = Math.min(255, Math.round((r / count) * 1.3));
+          const avgG = Math.min(255, Math.round((g / count) * 1.3));
+          const avgB = Math.min(255, Math.round((b / count) * 1.3));
+          if (Math.max(avgR, avgG, avgB) > 20) {
+            const colorStr = `${avgR}, ${avgG}, ${avgB}`;
+            setAmbientRgb(colorStr);
+            if (onAmbientColorChange) onAmbientColorChange(colorStr);
+          }
+        }
+      } catch {
+        const fallback = getAtmosphericDefault(camera);
+        setAmbientRgb(fallback);
+        if (onAmbientColorChange) onAmbientColorChange(fallback);
       }
-      animId = requestAnimationFrame(sampleLoop);
-    };
+    }, 4000);
 
-    animId = requestAnimationFrame(sampleLoop);
-    return () => cancelAnimationFrame(animId);
-  }, [isAmbientEnabled, camera, onAmbientColorChange]);
+    return () => clearInterval(interval);
+  }, [isAmbientEnabled, compact, camera, isImageStream, onAmbientColorChange]);
 
   // Handle Play/Pause
   const togglePlay = () => {
@@ -815,7 +850,7 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
   return (
     <div className={`relative ${className} flex flex-col`}>
       {/* Dynamic Ambient Video Glow Aura */}
-      {isAmbientEnabled && (
+      {isAmbientEnabled && !compact && (
         <div className="absolute -inset-4 sm:-inset-8 -z-10 pointer-events-none transition-opacity duration-500">
           <canvas
             ref={ambientCanvasRef}
@@ -880,8 +915,23 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         ) : (
           <video
             ref={videoRef}
+            autoPlay
             playsInline
             muted={isMuted}
+            crossOrigin="anonymous"
+            onPlaying={() => {
+              setIsLoading(false);
+              setIsPlaying(true);
+            }}
+            onCanPlay={() => {
+              setIsLoading(false);
+            }}
+            onLoadedData={() => {
+              setIsLoading(false);
+            }}
+            onTimeUpdate={() => {
+              if (isLoading) setIsLoading(false);
+            }}
             className={`w-full h-full transition-transform duration-100 ease-out ${
               ptz.aspectRatio === 'fill' ? 'object-cover' : 'object-contain'
             }`}

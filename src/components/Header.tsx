@@ -12,6 +12,7 @@ import {
   Pause,
   Menu,
   Clock,
+  Shuffle,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -25,6 +26,7 @@ interface HeaderProps {
   onOpenSnapshots: () => void;
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
+  onRandomizeCamera?: () => void;
 }
 
 const VIEW_MODES: { id: ViewMode; label: string; icon: React.FC<{ className?: string }> }[] = [
@@ -34,7 +36,7 @@ const VIEW_MODES: { id: ViewMode; label: string; icon: React.FC<{ className?: st
   { id: 'map', label: 'Map', icon: Map },
 ];
 
-export const Header: React.FC<HeaderProps> = ({
+export const Header: React.FC<HeaderProps> = React.memo(({
   viewMode,
   onSetViewMode,
   cameraCount,
@@ -45,6 +47,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenSnapshots,
   isSidebarOpen,
   onToggleSidebar,
+  onRandomizeCamera,
 }) => {
   const [utcTime, setUtcTime] = useState<string>('');
 
@@ -74,14 +77,24 @@ export const Header: React.FC<HeaderProps> = ({
 
         <div className="flex items-center gap-2.5">
           <div className="relative w-7 h-7 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-center overflow-hidden">
-            <Radio className="w-3.5 h-3.5 text-white" />
-            <div className="absolute inset-0 bg-neutral-800/40 animate-radar origin-center pointer-events-none" />
+            <motion.div
+              animate={{ opacity: [1, 0.4], scale: [1, 0.95] }}
+              transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
+            >
+              <Radio className="w-3.5 h-3.5 text-white" />
+            </motion.div>
+            <div className="absolute inset-0 bg-neutral-800/40 pointer-events-none" />
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="font-extrabold text-sm md:text-base tracking-tight text-white uppercase">
-              CAMERA <span className="text-blue-500">DASHBOARD</span>
-            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-extrabold text-sm md:text-base tracking-tight text-white uppercase">
+                CAMERA <span className="text-blue-500">DASHBOARD</span>
+              </span>
+              <span className="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/40 text-[9px] font-bold text-blue-300 font-mono tracking-wider">
+                V1.5
+              </span>
+            </div>
             <div className="hidden sm:flex items-center gap-2 font-mono text-[10px]">
               <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-neutral-950 border border-neutral-800 text-neutral-400">
                 <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_8px_#3b82f6] animate-pulse" />
@@ -150,6 +163,19 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </motion.button>
 
+        {/* Randomize Camera Button */}
+        {onRandomizeCamera && (
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={onRandomizeCamera}
+            className="p-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-all cursor-pointer"
+            title="Randomize Landing Camera (R)"
+          >
+            <Shuffle className="w-3.5 h-3.5" />
+          </motion.button>
+        )}
+
         {/* Snapshot Archive Button */}
         <motion.button
           whileHover={{ scale: 1.05 }}
@@ -178,4 +204,6 @@ export const Header: React.FC<HeaderProps> = ({
       </div>
     </header>
   );
-};
+});
+
+Header.displayName = 'Header';

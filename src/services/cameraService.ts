@@ -1,4 +1,5 @@
 import { CameraData, CameraFeature } from '../types/camera';
+import { HAZCAMS_TOWER_CAMERAS } from './hazcamsData';
 
 const API_ENDPOINT = 'https://scriptkitty.cafe/relay/atmosx/cameras';
 const STORAGE_KEY_FAVORITES = 'camera_dashboard_favorites_v1';
@@ -479,7 +480,16 @@ export async function fetchCameras(onProgress?: (loaded: number) => void): Promi
       }
 
       // Incorporate all 212 HazCams severe weather tower cameras!
-      // (HazCams removed)
+      for (const hzCam of HAZCAMS_TOWER_CAMERAS) {
+        if (!seenIds.has(hzCam.id) && !seenUrls.has(hzCam.streamUrl) && !inaccessible.has(hzCam.id)) {
+          seenIds.add(hzCam.id);
+          seenUrls.add(hzCam.streamUrl);
+          combinedList.push({
+            ...hzCam,
+            isFavorite: favorites.has(hzCam.id),
+          });
+        }
+      }
 
       if (onProgress) {
         onProgress(combinedList.length);
@@ -489,8 +499,9 @@ export async function fetchCameras(onProgress?: (loaded: number) => void): Promi
       return combinedList;
     } catch (err) {
       console.warn('Failed to load camera feed from remote API, falling back to curated stations:', err);
-      inMemoryCameras = CURATED_FEATURED_CAMERAS;
-      return CURATED_FEATURED_CAMERAS;
+      const fallbackList = [...CURATED_FEATURED_CAMERAS, ...HAZCAMS_TOWER_CAMERAS];
+      inMemoryCameras = fallbackList;
+      return fallbackList;
     } finally {
       fetchPromise = null;
     }
@@ -534,13 +545,20 @@ export function getInaccessibleIds(): Set<string> {
     const raw = localStorage.getItem(STORAGE_KEY_INACCESSIBLE);
     if (!raw) return new Set();
     const arr = JSON.parse(raw);
-    return new Set(Array.isArray(arr) ? arr : []);
+    const valid = (Array.isArray(arr) ? arr : []).filter(
+      (id: string) => !id.startsWith('hazcam-') && !id.startsWith('haz-')
+    );
+    return new Set(valid);
   } catch {
     return new Set();
   }
 }
 
 export function markCameraInaccessible(cameraId: string): void {
+  // HazCams cameras are verified 24/7 weather networks and should not be hidden
+  if (cameraId.startsWith('hazcam-') || cameraId.startsWith('haz-')) {
+    return;
+  }
   try {
     const current = getInaccessibleIds();
     current.add(cameraId);
@@ -575,7 +593,7 @@ export function filterCameras(
 
     if (source !== 'ALL' && source !== 'FAVORITES') {
       if (source === 'RADAR_OMEGA') {
-        if (cam.source !== 'RADAR_OMEGA') return false;
+        if (cam.source !== 'RADAR_OMEGA' && cam.source !== 'HAZCAMS' && cam.source !== 'HazCams') return false;
       } else if (cam.source !== source) {
         return false;
       }

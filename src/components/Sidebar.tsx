@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useDeferredValue } from 'react';
 import { CameraData, CameraSourceFilter, isChaser } from '../types/camera';
 import { US_STATES } from '../services/cameraService';
 import { motion, AnimatePresence } from 'motion/react';
@@ -21,7 +21,162 @@ import {
   RotateCcw,
   GripVertical,
   ArrowDownToLine,
+  ArrowLeft,
 } from 'lucide-react';
+
+interface CameraListItemProps {
+  cam: CameraData;
+  isSelected: boolean;
+  isFav: boolean;
+  onSelectCamera: (cam: CameraData) => void;
+  onToggleFavorite: (id: string) => void;
+  onAddToGrid: (cam: CameraData) => void;
+}
+
+const CameraListItem: React.FC<CameraListItemProps> = React.memo(({
+  cam,
+  isSelected,
+  isFav,
+  onSelectCamera,
+  onToggleFavorite,
+  onAddToGrid,
+}) => {
+  const cityPart = cam.location ? cam.location.split(',')[0].trim().toLowerCase() : '';
+  const cleanLower = cam.cleanName ? cam.cleanName.toLowerCase().trim() : '';
+  const isCityOnlyName = !cam.location || cam.location === 'United States' || cleanLower === cityPart || cleanLower === (cam.location ? cam.location.toLowerCase() : '');
+
+  const sourceText = cam.source === 'RADAR_OMEGA'
+    ? 'Source: RadarOmega'
+    : (cam.source === 'HAZCAMS' || cam.source === 'HazCams')
+    ? 'Source: HazCams'
+    : cam.source === 'WEATHER_WISE'
+    ? 'Source: WeatherWise'
+    : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
+    ? 'Source: WeatherFront'
+    : 'Source: Traffic DOT';
+
+  return (
+    <motion.div
+      whileHover={{ x: 2 }}
+      animate={isSelected ? { scale: [1, 1.02, 1] } : {}}
+      transition={{ duration: 0.3 }}
+      draggable={true}
+      onDragStart={(e: any) => {
+        if (e.dataTransfer) {
+          e.dataTransfer.setData('application/camera-json', JSON.stringify(cam));
+          e.dataTransfer.setData('text/plain', cam.id);
+          e.dataTransfer.effectAllowed = 'copyMove';
+        }
+      }}
+      onClick={() => onSelectCamera(cam)}
+      className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 group relative select-none ${
+        isSelected
+          ? 'bg-neutral-900 border border-blue-500/80 shadow-[0_0_15px_rgba(59,130,246,0.3)]'
+          : 'hover:bg-neutral-950 border border-transparent hover:border-neutral-800'
+      }`}
+      title="Click to focus or drag onto wall slots"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+            <div
+              className="cursor-grab active:cursor-grabbing p-0.5 rounded text-neutral-600 group-hover:text-neutral-400 hover:text-white transition-colors"
+              title="Drag feed to wall slots"
+            >
+              <GripVertical className="w-3 h-3" />
+            </div>
+            {isChaser(cam) ? (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-600/80 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
+                Storm Chaser
+              </span>
+            ) : (cam.source === 'RADAR_OMEGA' || cam.source === 'HAZCAMS' || cam.source === 'HazCams') ? (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Radio className="w-2.5 h-2.5 text-emerald-400" />
+                Tower Camera
+              </span>
+            ) : (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-600/80 text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1">
+                <Car className="w-2.5 h-2.5 text-amber-400" />
+                Traffic Camera
+              </span>
+            )}
+            {cam.stateCode && (
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-white font-bold">
+                {cam.stateCode}
+              </span>
+            )}
+            {isSelected && (
+              <span className="text-[9px] text-white font-bold flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6] inline-block" />
+                ACTIVE
+              </span>
+            )}
+          </div>
+          <p
+            className={`text-xs font-semibold truncate ${
+              isSelected ? 'text-white' : 'text-neutral-200 group-hover:text-white'
+            }`}
+            title={cam.name}
+          >
+            {cam.cleanName}
+          </p>
+          <div className="flex items-center text-[10px] text-neutral-400 truncate gap-1.5 mt-1">
+            {!isCityOnlyName && cam.location && (
+              <>
+                <span className="truncate">{cam.location}</span>
+                <span className="text-neutral-600 shrink-0">•</span>
+              </>
+            )}
+            <span className="text-neutral-500 font-mono text-[9px] shrink-0 translate-y-[1.5px]">
+              {sourceText}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1 shrink-0 pt-0.5">
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.85 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleFavorite(cam.id);
+            }}
+            className={`p-1.5 rounded hover:bg-neutral-800 transition-colors cursor-pointer ${
+              isFav ? 'text-blue-400' : 'text-neutral-600 hover:text-neutral-300'
+            }`}
+            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+          >
+            <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-blue-400 text-blue-400' : ''}`} />
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.15 }}
+            whileTap={{ scale: 0.85 }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToGrid(cam);
+            }}
+            className="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer border border-neutral-800"
+            title="Add to Multi-View Wall"
+          >
+            <Plus className="w-3 h-3" />
+          </motion.button>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5 font-mono">
+        <span>
+          {cam.coordinates[1].toFixed(2)}°, {cam.coordinates[0].toFixed(2)}°
+        </span>
+        <span className="text-neutral-400">
+          LIVE
+        </span>
+      </div>
+    </motion.div>
+  );
+});
+CameraListItem.displayName = 'CameraListItem';
 
 interface SidebarProps {
   cameras: CameraData[];
@@ -36,13 +191,14 @@ interface SidebarProps {
   onSelectState?: (state: string) => void;
   onClose?: () => void;
   isOpen?: boolean;
+  onGoBack?: () => void;
 }
 
 const ITEMS_PER_PAGE = 40;
 
 const POPULAR_QUICK_STATES = ['GA', 'FL', 'TX', 'CA', 'CO', 'NY', 'VA', 'SC', 'MO'];
 
-export const Sidebar: React.FC<SidebarProps> = ({
+export const Sidebar: React.FC<SidebarProps> = React.memo(({
   cameras,
   selectedCamera,
   onSelectCamera,
@@ -55,8 +211,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectState: externalOnSelectState,
   onClose,
   isOpen = true,
+  onGoBack,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const deferredQuery = useDeferredValue(searchQuery);
   const [sourceFilter, setSourceFilter] = useState<CameraSourceFilter>('ALL');
   const [internalSelectedState, setInternalSelectedState] = useState<string>('');
   const [page, setPage] = useState<number>(1);
@@ -99,7 +257,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     let db = 0;
     for (const c of cameras) {
       if (isChaser(c)) ww++;
-      else if (c.source === 'RADAR_OMEGA') ro++;
+      else if (c.source === 'RADAR_OMEGA' || c.source === 'HAZCAMS' || c.source === 'HazCams') ro++;
       else if (c.source === 'DATABASE') db++;
     }
     return {
@@ -112,15 +270,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
     };
   }, [cameras, favoriteIds]);
 
-  // Compute filtered cameras
+  // Compute filtered cameras using deferred query for 60fps typing responsiveness
   const filteredCameras = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
 
-    return cameras.filter((cam) => {
+    const result = cameras.filter((cam) => {
       if (sourceFilter === 'FAVORITES') {
         if (!favoriteIds.has(cam.id)) return false;
       } else if (sourceFilter === 'RADAR_OMEGA') {
-        if (cam.source !== 'RADAR_OMEGA') return false;
+        if (cam.source !== 'RADAR_OMEGA' && cam.source !== 'HAZCAMS' && cam.source !== 'HazCams') return false;
       } else if (sourceFilter === 'WEATHER_WISE') {
         if (!isChaser(cam)) return false;
       } else if (sourceFilter !== 'ALL') {
@@ -140,7 +298,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         cam.stateCode.toLowerCase().includes(q)
       );
     });
-  }, [cameras, searchQuery, sourceFilter, selectedState, favoriteIds]);
+
+    if (selectedCamera) {
+      const idx = result.findIndex((c) => c.id === selectedCamera.id);
+      if (idx > 0) {
+        const [match] = result.splice(idx, 1);
+        result.unshift(match);
+      }
+    }
+
+    return result;
+  }, [cameras, deferredQuery, sourceFilter, selectedState, favoriteIds, selectedCamera]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCameras.length / ITEMS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -458,9 +626,21 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Results Header with Page controls */}
       <div className="px-3.5 py-2 bg-black border-b border-neutral-800 flex items-center justify-between text-[11px] text-neutral-400">
         <div className="flex items-center gap-2 truncate">
-          <span className="font-medium">
-            MATCHING: <span className="text-white font-bold font-mono">{filteredCameras.length.toLocaleString()}</span>
-          </span>
+          {onGoBack ? (
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={onGoBack}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-blue-950/80 border border-blue-600/80 text-blue-200 text-[10px] font-bold hover:bg-blue-900 transition-colors cursor-pointer"
+              title="Go back to full camera list"
+            >
+              <ArrowLeft className="w-3 h-3" /> Go Back
+            </motion.button>
+          ) : (
+            <span className="font-medium">
+              MATCHING: <span className="text-white font-bold font-mono">{filteredCameras.length.toLocaleString()}</span>
+            </span>
+          )}
           {selectedState && (
             <span className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-blue-300 text-[10px] font-bold">
               {selectedState}
@@ -514,146 +694,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </motion.button>
           </div>
         ) : (
-          paginatedList.map((cam) => {
-            const isSelected = selectedCamera?.id === cam.id;
-            const isFav = favoriteIds.has(cam.id);
-
-            return (
-              <motion.div
-                whileHover={{ x: 2 }}
-                key={cam.id}
-                draggable={true}
-                onDragStart={(e: any) => {
-                  if (e.dataTransfer) {
-                    e.dataTransfer.setData('application/camera-json', JSON.stringify(cam));
-                    e.dataTransfer.setData('text/plain', cam.id);
-                    e.dataTransfer.effectAllowed = 'copyMove';
-                  }
-                }}
-                onClick={() => onSelectCamera(cam)}
-                className={`p-2.5 rounded-lg cursor-pointer transition-all flex flex-col gap-1 group relative select-none ${
-                  isSelected
-                    ? 'bg-neutral-900 border border-neutral-700 shadow-sm'
-                    : 'hover:bg-neutral-950 border border-transparent hover:border-neutral-800'
-                }`}
-                title="Click to focus or drag onto wall slots"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                      <div
-                        className="cursor-grab active:cursor-grabbing p-0.5 rounded text-neutral-600 group-hover:text-neutral-400 hover:text-white transition-colors"
-                        title="Drag feed to wall slots"
-                      >
-                        <GripVertical className="w-3 h-3" />
-                      </div>
-                      {isChaser(cam) ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-950/80 border border-blue-600/80 text-blue-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <CloudLightning className="w-2.5 h-2.5 text-blue-400" />
-                          Storm Chaser
-                        </span>
-                      ) : cam.source === 'RADAR_OMEGA' ? (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/80 border border-emerald-600/80 text-emerald-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Radio className="w-2.5 h-2.5 text-emerald-400" />
-                          Tower Camera
-                        </span>
-                      ) : (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950/80 border border-amber-600/80 text-amber-300 font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Car className="w-2.5 h-2.5 text-amber-400" />
-                          Traffic Camera
-                        </span>
-                      )}
-                      {cam.stateCode && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-800 text-white font-bold">
-                          {cam.stateCode}
-                        </span>
-                      )}
-                      {isSelected && (
-                        <span className="text-[9px] text-white font-bold flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_6px_#3b82f6] inline-block" />
-                          ACTIVE
-                        </span>
-                      )}
-                    </div>
-                    <p
-                      className={`text-xs font-semibold truncate ${
-                        isSelected ? 'text-white' : 'text-neutral-200 group-hover:text-white'
-                      }`}
-                      title={cam.name}
-                    >
-                      {cam.cleanName}
-                    </p>
-                    {(() => {
-                      const cityPart = cam.location ? cam.location.split(',')[0].trim().toLowerCase() : '';
-                      const cleanLower = cam.cleanName ? cam.cleanName.toLowerCase().trim() : '';
-                      const isCityOnlyName = !cam.location || cam.location === 'United States' || cleanLower === cityPart || cleanLower === (cam.location ? cam.location.toLowerCase() : '');
-                      
-                      const sourceText = cam.source === 'RADAR_OMEGA'
-                        ? 'Source: RadarOmega'
-                        : cam.source === 'WEATHER_WISE'
-                        ? 'Source: WeatherWise'
-                        : cam.streamUrl.includes('weatherfront') || cam.streamUrl.includes('maxvelocity')
-                        ? 'Source: WeatherFront'
-                        : 'Source: Traffic DOT';
-
-                      return (
-                        <div className="flex items-center text-[10px] text-neutral-400 truncate gap-1.5 mt-1">
-                          {!isCityOnlyName && cam.location && (
-                            <>
-                              <span className="truncate">{cam.location}</span>
-                              <span className="text-neutral-600 shrink-0">•</span>
-                            </>
-                          )}
-                          <span className="text-neutral-500 font-mono text-[9px] shrink-0 translate-y-[1.5px]">
-                            {sourceText}
-                          </span>
-                        </div>
-                      );
-                    })()}
-                  </div>
-
-                  <div className="flex items-center gap-1 shrink-0 pt-0.5">
-                    <motion.button
-                      whileHover={{ scale: 1.15 }}
-                      whileTap={{ scale: 0.85 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onToggleFavorite(cam.id);
-                      }}
-                      className={`p-1.5 rounded hover:bg-neutral-800 transition-colors cursor-pointer ${
-                        isFav ? 'text-blue-400' : 'text-neutral-600 hover:text-neutral-300'
-                      }`}
-                      title={isFav ? 'Remove from favorites' : 'Add to favorites'}
-                    >
-                      <Star className={`w-3.5 h-3.5 ${isFav ? 'fill-blue-400 text-blue-400' : ''}`} />
-                    </motion.button>
-
-                    <motion.button
-                      whileHover={{ scale: 1.15 }}
-                      whileTap={{ scale: 0.85 }}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onAddToGrid(cam);
-                      }}
-                      className="p-1.5 rounded bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white transition-colors cursor-pointer border border-neutral-800"
-                      title="Add to Multi-View Wall"
-                    >
-                      <Plus className="w-3 h-3" />
-                    </motion.button>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-0.5 font-mono">
-                  <span>
-                    {cam.coordinates[1].toFixed(2)}°, {cam.coordinates[0].toFixed(2)}°
-                  </span>
-                  <span className="text-neutral-400">
-                    LIVE
-                  </span>
-                </div>
-              </motion.div>
-            );
-          })
+          paginatedList.map((cam) => (
+            <CameraListItem
+              key={cam.id}
+              cam={cam}
+              isSelected={selectedCamera?.id === cam.id}
+              isFav={favoriteIds.has(cam.id)}
+              onSelectCamera={onSelectCamera}
+              onToggleFavorite={onToggleFavorite}
+              onAddToGrid={onAddToGrid}
+            />
+          ))
         )}
       </div>
 
@@ -681,4 +732,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
     </aside>
   );
-};
+});
+
+Sidebar.displayName = 'Sidebar';

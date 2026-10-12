@@ -18,15 +18,15 @@ import {
 
 interface MultiViewMatrixProps {
   layout: 'grid-2x2' | 'grid-3x3';
-  activeCameras: CameraData[];
+  activeCameras: (CameraData | null)[];
   allCameras: CameraData[];
   onSelectFocus: (camera: CameraData) => void;
-  onUpdateSlot: (index: number, camera: CameraData) => void;
+  onUpdateSlot: (index: number, camera: CameraData | null) => void;
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
   onInaccessible?: (cameraId: string) => void;
 }
 
-export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
+export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = React.memo(({
   layout,
   activeCameras,
   allCameras,
@@ -46,7 +46,7 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
   const [draggedSlotSource, setDraggedSlotSource] = useState<number | null>(null);
 
   const slots: (CameraData | null)[] = Array.from({ length: slotCount }).map((_, i) => {
-    return activeCameras[i] || (allCameras[i] ?? null);
+    return activeCameras[i] !== undefined ? activeCameras[i] : null;
   });
 
   const handleRandomizeSlot = (slotIdx: number) => {
@@ -60,6 +60,12 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
     for (let i = 0; i < slotCount; i++) {
       const randomCam = allCameras[Math.floor(Math.random() * allCameras.length)];
       onUpdateSlot(i, randomCam);
+    }
+  };
+
+  const handleClearAll = () => {
+    for (let i = 0; i < slotCount; i++) {
+      onUpdateSlot(i, null);
     }
   };
 
@@ -93,9 +99,7 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
         const targetCam = slots[targetIdx];
         if (srcCam) {
           onUpdateSlot(targetIdx, srcCam);
-          if (targetCam) {
-            onUpdateSlot(srcIdx, targetCam);
-          }
+          onUpdateSlot(srcIdx, targetCam ?? null);
           setDropSuccessIndex(targetIdx);
           setTimeout(() => setDropSuccessIndex(null), 1400);
         }
@@ -146,6 +150,17 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
           <motion.button
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
+            onClick={handleClearAll}
+            className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-400 hover:text-red-400 border border-neutral-800 transition-all flex items-center gap-1.5 cursor-pointer text-xs font-semibold"
+            title="Clear all feeds to empty slots"
+          >
+            <X className="w-3.5 h-3.5" />
+            <span>Clear Wall</span>
+          </motion.button>
+
+          <motion.button
+            whileHover={{ scale: 1.04 }}
+            whileTap={{ scale: 0.96 }}
             onClick={handleRandomizeAll}
             className="px-2.5 py-1 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white border border-neutral-800 transition-all flex items-center gap-1.5 cursor-pointer text-xs font-semibold"
             title="Randomize all feeds in matrix"
@@ -174,13 +189,24 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                 onDragOver={(e) => handleSlotDragOver(idx, e)}
                 onDragLeave={(e) => handleSlotDragLeave(idx, e)}
                 onDrop={(e) => handleSlotDrop(idx, e)}
-                className={`relative rounded-xl border border-dashed flex flex-col items-center justify-center p-4 text-center group cursor-pointer transition-all overflow-hidden ${
+                className={`relative rounded-xl border border-dashed flex flex-col items-center justify-center p-4 text-center group cursor-pointer transition-all overflow-hidden min-h-[170px] select-none ${
                   isDragOver
                     ? 'border-blue-400 bg-blue-950/70 shadow-[0_0_25px_rgba(59,130,246,0.5)] animate-drop-pulse'
-                    : 'border-neutral-800 bg-neutral-950 hover:border-neutral-600'
+                    : 'border-neutral-800/80 bg-[#070707] hover:border-neutral-600 hover:bg-neutral-950'
                 }`}
                 onClick={() => setReplacingSlotIndex(idx)}
               >
+                {/* Top Channel Header */}
+                <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 pointer-events-none">
+                  <span className="px-1.5 py-0.5 rounded-md bg-neutral-900 border border-neutral-800 text-neutral-400 font-mono text-[9px] font-bold flex items-center gap-1">
+                    <span className="w-1 h-1 rounded-full bg-neutral-600 inline-block" />
+                    CH {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}
+                  </span>
+                  <span className="text-[9px] font-mono uppercase text-neutral-600 tracking-wider">
+                    EMPTY SLOT
+                  </span>
+                </div>
+
                 {/* Holographic Drag Target Overlay */}
                 <AnimatePresence>
                   {isDragOver && (
@@ -203,12 +229,14 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                   )}
                 </AnimatePresence>
 
-                <Plus className="w-7 h-7 text-neutral-600 group-hover:text-white transition-colors mb-1.5" />
-                <span className="text-xs text-neutral-400 group-hover:text-white font-mono font-medium">
-                  ASSIGN CH 0{idx + 1}
+                <div className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-2 group-hover:border-blue-500/50 group-hover:bg-blue-950/30 transition-all shadow-inner">
+                  <Plus className="w-5 h-5 text-neutral-500 group-hover:text-blue-400 transition-colors" />
+                </div>
+                <span className="text-xs text-neutral-300 group-hover:text-white font-mono font-semibold tracking-wide uppercase">
+                  AWAITING FEED
                 </span>
-                <span className="text-[10px] text-neutral-600 mt-1">
-                  Click or drag camera here
+                <span className="text-[10px] text-neutral-500 group-hover:text-neutral-400 mt-1">
+                  Click or drag camera here to assign
                 </span>
               </motion.div>
             );
@@ -305,18 +333,19 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
-                  {/* Remove Camera */}
+                <div className="flex items-center gap-1 opacity-90 sm:opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
+                  {/* Remove Camera from Slot */}
                   <motion.button
+                    whileHover={{ scale: 1.15 }}
                     whileTap={{ scale: 0.9 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       onUpdateSlot(idx, null);
                     }}
-                    className="p-1 rounded-md bg-black/90 border border-neutral-800 text-neutral-400 hover:text-red-500 hover:border-red-900 transition-all cursor-pointer"
-                    title="Remove Camera"
+                    className="p-1 rounded-md bg-black/90 border border-neutral-800 text-neutral-400 hover:text-red-400 hover:border-red-700/80 hover:bg-red-950/60 transition-all cursor-pointer shadow-sm"
+                    title="Remove camera (clear slot)"
                   >
-                    <X className="w-3 h-3" />
+                    <X className="w-3.5 h-3.5" />
                   </motion.button>
                   {/* Solo Audio */}
                   <motion.button
@@ -424,12 +453,25 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                   <Search className="w-3.5 h-3.5 text-blue-400" />
                   Assign Channel #{replacingSlotIndex + 1}
                 </span>
-                <button
-                  onClick={() => setReplacingSlotIndex(null)}
-                  className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {slots[replacingSlotIndex] && (
+                    <button
+                      onClick={() => {
+                        onUpdateSlot(replacingSlotIndex, null);
+                        setReplacingSlotIndex(null);
+                      }}
+                      className="px-2 py-1 text-[11px] rounded bg-red-950/60 border border-red-900/60 text-red-300 hover:bg-red-900/80 hover:text-white transition-colors cursor-pointer"
+                    >
+                      Clear Slot
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setReplacingSlotIndex(null)}
+                    className="p-1 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-900 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="p-3 border-b border-neutral-800">
@@ -461,17 +503,16 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
                         <span className="text-white group-hover:text-blue-300 font-semibold truncate">
                           {cam.cleanName}
                         </span>
-                        <span
-                          className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase shrink-0 ${
-                            cam.source === 'RADAR_OMEGA'
-                              ? 'bg-emerald-950/80 border-emerald-600/80 text-emerald-300'
-                              : cam.source === 'WEATHER_WISE'
-                              ? 'bg-blue-950/80 border-blue-600/80 text-blue-300'
-                              : 'bg-amber-950/80 border-amber-600/80 text-amber-300'
-                          }`}
-                        >
-                          {getSourceDisplayName(cam.source)}
-                        </span>
+                        {(() => {
+                          const badgeStyle = getSourceBadgeStyle(cam);
+                          return (
+                            <span
+                              className={`text-[9px] px-1.5 py-0.5 rounded border font-bold uppercase shrink-0 ${badgeStyle.bg} ${badgeStyle.border} ${badgeStyle.text}`}
+                            >
+                              {badgeStyle.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <span className="text-neutral-500 text-[10px] truncate">{cam.location}</span>
                     </div>
@@ -487,4 +528,6 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = ({
       </AnimatePresence>
     </div>
   );
-};
+});
+
+MultiViewMatrix.displayName = 'MultiViewMatrix';

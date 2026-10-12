@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet.markercluster/dist/MarkerCluster.css';
@@ -6,7 +6,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { CameraData, getSourceBadgeStyle } from '../types/camera';
 import { motion } from 'motion/react';
-import { Radio, Car, RadioTower, Zap } from 'lucide-react';
+import { Radio } from 'lucide-react';
 
 interface CameraMapProps {
   cameras: CameraData[];
@@ -19,7 +19,6 @@ interface CameraMapProps {
 
 const REGION_PRESETS = [
   { name: 'National', center: [39.0, -96.0] as [number, number], zoom: 4 },
-  { name: 'Florida', center: [27.8, -82.0] as [number, number], zoom: 6 },
   { name: 'Northwest', center: [45.5, -120.5] as [number, number], zoom: 6 },
   { name: 'Northeast', center: [42.0, -73.5] as [number, number], zoom: 6 },
   { name: 'Southwest', center: [33.5, -105.0] as [number, number], zoom: 6 },
@@ -28,7 +27,7 @@ const REGION_PRESETS = [
   { name: 'West Coast', center: [37.0, -120.0] as [number, number], zoom: 6 },
 ];
 
-export const CameraMap: React.FC<CameraMapProps> = ({
+export const CameraMap: React.FC<CameraMapProps> = React.memo(({
   cameras,
   selectedCamera,
   selectedState,
@@ -43,12 +42,23 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
   const [showRadar, setShowRadar] = useState(true);
   const [feedType, setFeedType] = useState<'ALL' | 'DATABASE' | 'RADAR_OMEGA' | 'WEATHER_WISE'>('ALL');
+  const [activeRegion, setActiveRegion] = useState<string | null>(null);
+
+  const handleRegionClick = useCallback((preset: typeof REGION_PRESETS[0]) => {
+    setActiveRegion(preset.name);
+    mapInstanceRef.current?.flyTo(preset.center, preset.zoom);
+
+    const timer = setTimeout(() => {
+      setActiveRegion((curr) => (curr === preset.name ? null : curr));
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   // Counts for the HUD filter
   const counts = useMemo(() => {
     let traffic = 0;
     let towers = 0;
-    let hazcams = 0;
     let chasers = 0;
 
     const basePool = selectedState
@@ -80,7 +90,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       attributionControl: false,
     });
 
-    // High-contrast Black and White base map using Esri World Dark Gray Canvas (No Carto, No API Key)
+    // High-contrast Black and White base map using Esri World Dark Gray Canvas
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
       {
@@ -91,7 +101,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
       }
     ).addTo(map);
 
-    // Dark Gray Reference Overlay (Boundaries & Labels)
+    // Dark Gray Reference Overlay
     L.tileLayer(
       'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
       {
@@ -104,7 +114,6 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-    // Custom Marker Clustering with signature blue theme
     markersLayerRef.current = L.markerClusterGroup({
       chunkedLoading: true,
       spiderfyOnMaxZoom: true,
@@ -116,11 +125,9 @@ export const CameraMap: React.FC<CameraMapProps> = ({
         let diameter = 34;
 
         if (count >= 100) {
-          // Radiant bright blue for large density clusters
           bgStyle = 'background: rgba(37, 99, 235, 0.96); border: 2.5px solid #93c5fd; color: #ffffff; box-shadow: 0 0 20px rgba(59, 130, 246, 0.9);';
           diameter = 44;
         } else if (count >= 10) {
-          // Medium rich blue
           bgStyle = 'background: rgba(29, 78, 216, 0.92); border: 2px solid #60a5fa; color: #ffffff; box-shadow: 0 0 14px rgba(59, 130, 246, 0.7);';
           diameter = 38;
         }
@@ -141,7 +148,7 @@ export const CameraMap: React.FC<CameraMapProps> = ({
     };
   }, []);
 
-  // Handle NEXRAD / Weather Radar overlay via official NWS / IEM WMS service
+  // Handle NEXRAD Weather Radar overlay
   useEffect(() => {
     const map = mapInstanceRef.current;
     if (!map) return;
@@ -169,7 +176,25 @@ export const CameraMap: React.FC<CameraMapProps> = ({
     }
   }, [showRadar]);
 
-  // Update Markers with Category Filtering and Distinct Color Pins
+  const mapIcons = useMemo(() => ({
+    chaser: L.divIcon({
+      className: 'custom-type-pin',
+      html: '<div style="width: 10px; height: 10px; border-radius: 50%; background: #3b82f6; border: 1.5px solid #000000; box-shadow: 0 0 6px rgba(59, 130, 246, 0.85);"></div>',
+      iconSize: [10, 10],
+    }),
+    tower: L.divIcon({
+      className: 'custom-type-pin',
+      html: '<div style="width: 10px; height: 10px; border-radius: 50%; background: #10b981; border: 1.5px solid #000000; box-shadow: 0 0 6px rgba(16, 185, 129, 0.85);"></div>',
+      iconSize: [10, 10],
+    }),
+    traffic: L.divIcon({
+      className: 'custom-type-pin',
+      html: '<div style="width: 9px; height: 9px; border-radius: 50%; background: #f59e0b; border: 1.5px solid #000000; box-shadow: 0 0 5px rgba(245, 158, 11, 0.6);"></div>',
+      iconSize: [9, 9],
+    }),
+  }), []);
+
+  // Update Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current;
@@ -183,84 +208,67 @@ export const CameraMap: React.FC<CameraMapProps> = ({
 
     if (feedType !== 'ALL') {
       if (feedType === 'RADAR_OMEGA') {
-        targetPool = targetPool.filter((c) => c.source === 'RADAR_OMEGA');
+        targetPool = targetPool.filter((c) => c.source === 'RADAR_OMEGA' || c.source === 'HAZCAMS' || c.source === 'HazCams');
       } else {
         targetPool = targetPool.filter((c) => c.source === feedType);
       }
     }
 
-    targetPool.forEach((cam) => {
+    const markersToAdd: L.Marker[] = [];
+
+    for (let i = 0; i < targetPool.length; i++) {
+      const cam = targetPool[i];
       const [lng, lat] = cam.coordinates;
-      if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return;
+      if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) continue;
 
-      const isSelected = selectedCamera?.id === cam.id;
+      const icon = cam.source === 'WEATHER_WISE'
+        ? mapIcons.chaser
+        : (cam.source === 'RADAR_OMEGA' || cam.source === 'HAZCAMS' || cam.source === 'HazCams')
+        ? mapIcons.tower
+        : mapIcons.traffic;
 
-      // Color coding per camera kind:
-      // - Storm Chasers (WEATHER_WISE): Bright Blue (#3b82f6)
-      // - Tower Cameras (RADAR_OMEGA): Emerald Green (#10b981)
-      // - Traffic Cameras (DATABASE): Amber / Warning Gold (#f59e0b)
-      let pinColor = '#f59e0b';
-      let haloColor = 'rgba(245, 158, 11, 0.6)';
+      const marker = L.marker([lat, lng], { icon });
 
-      if (cam.source === 'WEATHER_WISE') {
-        pinColor = '#3b82f6';
-        haloColor = 'rgba(59, 130, 246, 0.85)';
-      } else if (cam.source === 'RADAR_OMEGA') {
-        pinColor = '#10b981';
-        haloColor = 'rgba(16, 185, 129, 0.85)';
-      }
+      marker.bindPopup(() => {
+        const badgeStyle = getSourceBadgeStyle(cam);
+        const badgeName = badgeStyle.label.toUpperCase();
+        const badgeColor = badgeStyle.hex;
+        const locationDisplay = cam.location && cam.location !== 'null' && cam.location.trim() !== '' ? cam.location : '';
 
-      const pinSize = isSelected ? 18 : 9;
-      const borderSize = isSelected ? 3 : 1.5;
+        const popupContent = document.createElement('div');
+        popupContent.className =
+          'font-sans text-xs text-white p-3 min-w-[230px] bg-neutral-950 rounded-lg shadow-2xl border border-neutral-800';
+        popupContent.innerHTML = `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
+            <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); border: 1px solid ${badgeColor}; color: ${badgeColor}; letter-spacing: 0.05em; text-transform: uppercase;">
+              ${badgeName}
+            </span>
+            ${cam.stateCode ? `<span style="font-size: 10px; color: #9ca3af; font-weight: 700;">${cam.stateCode}</span>` : ''}
+          </div>
+          <div style="font-weight: 700; font-size: 13px; margin-bottom: 3px; color: #ffffff; line-height: 1.3;">${cam.cleanName}</div>
+          ${locationDisplay ? `<div style="color: #9ca3af; font-size: 11px; margin-bottom: 8px;">${locationDisplay}</div>` : ''}
+          <div style="display: flex; gap: 6px; margin-top: 8px;">
+            <button id="view-cam-${cam.id}" style="flex: 1; padding: 6px 10px; background: #ffffff; color: #000000; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">MONITOR</button>
+            <button id="grid-cam-${cam.id}" style="padding: 6px 10px; background: #262626; color: #ffffff; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">+ WALL</button>
+          </div>
+        `;
 
-      const customIcon = L.divIcon({
-        className: 'custom-type-pin',
-        html: `<div style="width: ${pinSize}px; height: ${pinSize}px; border-radius: 50%; background: ${pinColor}; border: ${borderSize}px solid #000000; box-shadow: 0 0 ${isSelected ? '12px' : '6px'} ${haloColor};"></div>`,
-        iconSize: [pinSize, pinSize],
-      });
+        setTimeout(() => {
+          document.getElementById(`view-cam-${cam.id}`)?.addEventListener('click', () => onSelectCamera(cam));
+          document.getElementById(`grid-cam-${cam.id}`)?.addEventListener('click', () => onAddToGrid?.(cam));
+        }, 0);
 
-      const marker = L.marker([lat, lng], { icon: customIcon });
-
-      const locationDisplay =
-        cam.location && cam.location !== 'null' && cam.location.trim() !== ''
-          ? cam.location
-          : '';
-
-      const badgeStyle = getSourceBadgeStyle(cam);
-      const badgeName = badgeStyle.label.toUpperCase();
-      const badgeColor = badgeStyle.hex;
-
-      const popupContent = document.createElement('div');
-      popupContent.className =
-        'font-sans text-xs text-white p-3 min-w-[230px] bg-neutral-950 rounded-lg shadow-2xl border border-neutral-800';
-      popupContent.innerHTML = `
-        <div style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 4px;">
-          <span style="font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(0,0,0,0.6); border: 1px solid ${badgeColor}; color: ${badgeColor}; letter-spacing: 0.05em; text-transform: uppercase;">
-            ${badgeName}
-          </span>
-          ${cam.stateCode ? `<span style="font-size: 10px; color: #9ca3af; font-weight: 700;">${cam.stateCode}</span>` : ''}
-        </div>
-        <div style="font-weight: 700; font-size: 13px; margin-bottom: 3px; color: #ffffff; line-height: 1.3;">${cam.cleanName}</div>
-        ${locationDisplay ? `<div style="color: #9ca3af; font-size: 11px; margin-bottom: 8px;">${locationDisplay}</div>` : ''}
-        <div style="display: flex; gap: 6px; margin-top: 8px;">
-          <button id="view-cam-${cam.id}" style="flex: 1; padding: 6px 10px; background: #ffffff; color: #000000; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">MONITOR</button>
-          <button id="grid-cam-${cam.id}" style="padding: 6px 10px; background: #262626; color: #ffffff; border-radius: 4px; font-weight: 700; font-size: 11px; cursor: pointer;">+ WALL</button>
-        </div>
-      `;
-
-      marker.bindPopup(popupContent, {
+        return popupContent;
+      }, {
         closeButton: true,
         className: 'custom-clean-popup',
       });
 
-      marker.on('popupopen', () => {
-        document.getElementById(`view-cam-${cam.id}`)?.addEventListener('click', () => onSelectCamera(cam));
-        document.getElementById(`grid-cam-${cam.id}`)?.addEventListener('click', () => onAddToGrid?.(cam));
-      });
+      markersToAdd.push(marker);
+    }
 
-      markersLayer.addLayer(marker);
-    });
-  }, [cameras, selectedCamera, selectedState, feedType, onSelectCamera, onAddToGrid]);
+    markersLayer.addLayers(markersToAdd);
+  }, [cameras, selectedState, feedType, mapIcons, onSelectCamera, onAddToGrid]);
 
   return (
     <div className={`relative w-full h-full bg-[#000000] overflow-hidden rounded-xl border border-neutral-800 ${className}`}>
@@ -340,8 +348,6 @@ export const CameraMap: React.FC<CameraMapProps> = ({
               <span className="text-[10px] text-emerald-400/80">{counts.towers}</span>
             </button>
 
-
-
             {/* Chasers */}
             <button
               onClick={() => setFeedType('WEATHER_WISE')}
@@ -364,22 +370,27 @@ export const CameraMap: React.FC<CameraMapProps> = ({
         <div className="flex flex-col gap-1 pt-1 border-t border-neutral-800/80">
           <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 px-0.5">Regions:</span>
           <div className="flex flex-wrap gap-1">
-            {REGION_PRESETS.map((preset) => (
-              <button
-                key={preset.name}
-                onClick={() => mapInstanceRef.current?.flyTo(preset.center, preset.zoom)}
-                className={`px-2 py-0.5 rounded border text-[10px] transition-all cursor-pointer ${
-                  preset.name === 'Florida'
-                    ? 'bg-blue-950/60 border-blue-700/60 text-blue-300 hover:bg-blue-900/80 hover:text-white font-bold'
-                    : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300 hover:text-white'
-                }`}
-              >
-                {preset.name}
-              </button>
-            ))}
+            {REGION_PRESETS.map((preset) => {
+              const isActive = activeRegion === preset.name;
+              return (
+                <button
+                  key={preset.name}
+                  onClick={() => handleRegionClick(preset)}
+                  className={`px-2 py-0.5 rounded border text-[10px] transition-all duration-700 cursor-pointer ${
+                    isActive
+                      ? 'bg-blue-600 border-blue-400 text-white font-bold shadow-[0_0_10px_rgba(59,130,246,0.8)]'
+                      : 'bg-neutral-900 hover:bg-neutral-800 border-neutral-800 text-neutral-300 hover:text-white'
+                  }`}
+                >
+                  {preset.name}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
     </div>
   );
-};
+});
+
+CameraMap.displayName = 'CameraMap';

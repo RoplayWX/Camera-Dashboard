@@ -14,18 +14,23 @@ import { FocusView } from './components/FocusView';
 import { MultiViewMatrix } from './components/MultiViewMatrix';
 import { CameraMap } from './components/CameraMap';
 import { SnapshotGalleryModal } from './components/SnapshotGalleryModal';
+import { SystemLoadingScreen } from './components/SystemLoadingScreen';
 import { motion, AnimatePresence } from 'motion/react';
 import { Radio } from 'lucide-react';
 
 export default function App() {
   const [cameras, setCameras] = useState<CameraData[]>(CURATED_FEATURED_CAMERAS);
-  const [selectedCamera, setSelectedCamera] = useState<CameraData>(CURATED_FEATURED_CAMERAS[0]);
+  const [selectedCamera, setSelectedCamera] = useState<CameraData>(() => {
+    const randomIndex = Math.floor(Math.random() * CURATED_FEATURED_CAMERAS.length);
+    return CURATED_FEATURED_CAMERAS[randomIndex] || CURATED_FEATURED_CAMERAS[0];
+  });
   const [gridCameras, setGridCameras] = useState<(CameraData | null)[]>(CURATED_FEATURED_CAMERAS.slice(0, 9));
   const [viewMode, setViewMode] = useState<ViewMode>('focus');
 
   // Loading state
   const [isInitializing, setIsInitializing] = useState<boolean>(true);
   const [loadedCount, setLoadedCount] = useState<number>(0);
+  const [showLoadingScreen, setShowLoadingScreen] = useState<boolean>(true);
 
   // Auto-patrol
   const [autoPatrol, setAutoPatrol] = useState<boolean>(false);
@@ -43,7 +48,7 @@ export default function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedState, setSelectedState] = useState<string>('');
 
-  // Fetch full camera dataset on mount
+  // Fetch full camera dataset on mount and randomize landing camera
   useEffect(() => {
     let isMounted = true;
     fetchCameras((count) => {
@@ -55,12 +60,13 @@ export default function App() {
         setIsInitializing(false);
 
         if (data.length > 0) {
-          const radarOrChaser = data.find((c) => c.source === 'RADAR_OMEGA' || c.source === 'WEATHER_WISE') || data[0];
-          setSelectedCamera(radarOrChaser);
+          // Randomize landing camera on launch across all loaded camera streams
+          const randomIndex = Math.floor(Math.random() * data.length);
+          setSelectedCamera(data[randomIndex]);
 
           const initialGrid = [
             ...data.filter((c) => c.source === 'WEATHER_WISE'),
-            ...data.filter((c) => c.source === 'RADAR_OMEGA').slice(0, 4),
+            ...data.filter((c) => c.source === 'RADAR_OMEGA' || c.source === 'HAZCAMS').slice(0, 4),
             ...data.filter((c) => c.source === 'DATABASE').slice(0, 4),
           ].slice(0, 9);
           setGridCameras(initialGrid);
@@ -97,6 +103,27 @@ export default function App() {
     return () => clearInterval(timer);
   }, [autoPatrol, cameras]);
 
+  // Camera navigation
+  const handleNextCamera = useCallback(() => {
+    if (cameras.length === 0) return;
+    const currIdx = cameras.findIndex((c) => c.id === selectedCamera.id);
+    const nextIdx = (currIdx + 1) % cameras.length;
+    setSelectedCamera(cameras[nextIdx]);
+  }, [cameras, selectedCamera]);
+
+  const handlePrevCamera = useCallback(() => {
+    if (cameras.length === 0) return;
+    const currIdx = cameras.findIndex((c) => c.id === selectedCamera.id);
+    const prevIdx = currIdx <= 0 ? cameras.length - 1 : currIdx - 1;
+    setSelectedCamera(cameras[prevIdx]);
+  }, [cameras, selectedCamera]);
+
+  const handleRandomFeed = useCallback(() => {
+    if (cameras.length === 0) return;
+    const randomIndex = Math.floor(Math.random() * cameras.length);
+    setSelectedCamera(cameras[randomIndex]);
+  }, [cameras]);
+
   // Keyboard navigation shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -120,33 +147,14 @@ export default function App() {
         setViewMode('map');
       } else if (e.key.toLowerCase() === 'p') {
         setAutoPatrol((v) => !v);
+      } else if (e.key.toLowerCase() === 'r') {
+        handleRandomFeed();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [cameras, selectedCamera]);
-
-  // Camera navigation
-  const handleNextCamera = useCallback(() => {
-    if (cameras.length === 0) return;
-    const currIdx = cameras.findIndex((c) => c.id === selectedCamera.id);
-    const nextIdx = (currIdx + 1) % cameras.length;
-    setSelectedCamera(cameras[nextIdx]);
-  }, [cameras, selectedCamera]);
-
-  const handlePrevCamera = useCallback(() => {
-    if (cameras.length === 0) return;
-    const currIdx = cameras.findIndex((c) => c.id === selectedCamera.id);
-    const prevIdx = currIdx <= 0 ? cameras.length - 1 : currIdx - 1;
-    setSelectedCamera(cameras[prevIdx]);
-  }, [cameras, selectedCamera]);
-
-  const handleRandomFeed = useCallback(() => {
-    if (cameras.length === 0) return;
-    const randomIndex = Math.floor(Math.random() * cameras.length);
-    setSelectedCamera(cameras[randomIndex]);
-  }, [cameras]);
+  }, [handleNextCamera, handlePrevCamera, handleRandomFeed]);
 
   const handleToggleFav = useCallback((id: string) => {
     toggleFavorite(id);
@@ -215,6 +223,7 @@ export default function App() {
         onOpenSnapshots={() => setIsGalleryOpen(true)}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((v) => !v)}
+        onRandomizeCamera={handleRandomFeed}
       />
 
       {/* Main App Workspace */}
@@ -234,6 +243,9 @@ export default function App() {
             onSelectState={setSelectedState}
             onSelectCamera={(cam) => {
               setSelectedCamera(cam);
+              if (cam.stateCode) {
+                setSelectedState(cam.stateCode);
+              }
               if (window.innerWidth < 1024) {
                 setIsSidebarOpen(false);
               }
@@ -244,6 +256,7 @@ export default function App() {
             onRandomFeed={handleRandomFeed}
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen((v) => !v)}
+            onGoBack={selectedState ? () => setSelectedState('') : undefined}
             className="w-full h-full"
           />
         </div>
@@ -348,6 +361,15 @@ export default function App() {
         onClear={() => setSnapshots([])}
         onDeleteOne={(id) => setSnapshots((prev) => prev.filter((s) => s.id !== id))}
       />
+
+      {/* High-Tech System Loading / Assets Initializing Screen */}
+      {showLoadingScreen && (
+        <SystemLoadingScreen
+          loadedCount={loadedCount}
+          isReady={!isInitializing}
+          onComplete={() => setShowLoadingScreen(false)}
+        />
+      )}
     </div>
   );
 }

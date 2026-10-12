@@ -30,7 +30,7 @@ interface FocusViewProps {
   onInaccessible?: (cameraId: string) => void;
 }
 
-export const FocusView: React.FC<FocusViewProps> = ({
+export const FocusView: React.FC<FocusViewProps> = React.memo(({
   camera,
   onNextCamera,
   onPrevCamera,
@@ -308,4 +308,6 @@ export const FocusView: React.FC<FocusViewProps> = ({
       </div>
     </div>
   );
-};
+});
+
+FocusView.displayName = 'FocusView';

@@ -21,7 +21,7 @@ export interface CameraData {
   coordinates: [number, number]; // [longitude, latitude]
   streamUrl: string;
   model: string;
-  source: 'WEATHER_WISE' | 'RADAR_OMEGA' | 'DATABASE' | string;
+  source: 'WEATHER_WISE' | 'RADAR_OMEGA' | 'HAZCAMS' | 'DATABASE' | string;
   isFavorite?: boolean;
 }
 
@@ -52,6 +52,9 @@ export function getSourceDisplayName(source: string): string {
   switch (source) {
     case 'RADAR_OMEGA':
       return 'RadarOmega';
+    case 'HAZCAMS':
+    case 'HazCams':
+      return 'HazCams';
     case 'WEATHER_WISE':
       return 'WeatherWise';
     case 'DATABASE':
@@ -108,6 +111,8 @@ export function getSourceBadgeStyle(cam: Partial<CameraData>): {
 
   switch (camData.source) {
     case 'RADAR_OMEGA':
+    case 'HAZCAMS':
+    case 'HazCams':
       return {
         bg: 'bg-emerald-950/70',
         text: 'text-emerald-300',
