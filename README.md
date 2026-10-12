@@ -56,8 +56,6 @@ Camera Dashboard is intended for weather monitoring and informational purposes. 
 
 **Always rely on official National Weather Service alerts and local emergency management instructions for weather-related safety decisions.** Never use this dashboard as your sole source of emergency information.
 
----
-
 ## 📄 License & Credits
 
 ### 📹 Camera & Data Providers
