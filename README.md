@@ -116,9 +116,9 @@ The rights governing Camera Dashboard's original source code are separate from t
 
 ---
 
-Camera Dashboard is developed and maintained as a hobby project, with the goal of bringing useful weather-monitoring resources together in one convenient place.
+**Camera Dashboard is developed and maintained purely as a hobby project, for personal weather monitoring and behind-the-scenes use. Its purpose is simply to bring useful weather-monitoring resources together in one convenient place—not to generate revenue or serve any commercial purpose.**
 
-Third-party providers may have their own commercial operations, subscription requirements, or usage restrictions. The non-commercial nature of Camera Dashboard does not override those providers' terms or licensing conditions.
+**Third-party providers may have their own commercial operations, subscription requirements, or usage restrictions. Camera Dashboard's non-commercial nature does not override those providers' terms or licensing conditions.**
 
 ---
 
