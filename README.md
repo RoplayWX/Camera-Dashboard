@@ -40,11 +40,15 @@ The exact frameworks, libraries, APIs, and data providers depend on the current 
 
 ## 📷 Preview
 
-A screenshot or preview image of the dashboard can be added here.
+<p align="center">
+  <a href="https://camera-dashboard-one.vercel.app">
+    <img src="https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/refs/heads/main/Camera-Dashboard-Thumbnail.png" alt="Camera Dashboard Preview" width="900">
+  </a>
+</p>
 
-To use the repository's existing dashboard image, you can add:
-
-[Camera Dashboard Preview](https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/refs/heads/main/Camera-Dashboard-Thumbnail.png)
+<p align="center">
+  <i>Click the preview to open Camera Dashboard.</i>
+</p>
 
 ## ⚠️ Disclaimer
 
