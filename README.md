@@ -44,7 +44,7 @@ A screenshot or preview image of the dashboard can be added here.
 
 To use the repository's existing dashboard image, you can add:
 
-`![Camera Dashboard Preview](https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/main/CAMERA%20DASHBOARD.png)`
+[Camera Dashboard Preview](https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/refs/heads/main/Camera-Dashboard-Thumbnail.png)
 
 ## ⚠️ Disclaimer
 
