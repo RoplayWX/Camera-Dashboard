@@ -87,8 +87,7 @@ Crediting a provider does not imply permission to redistribute or reuse its foot
 
 The license for Camera Dashboard's own source code, if specified in the repository, applies separately from the rights governing third-party content.
 
-### 💚 Non-Commercial Project
----
+## 💚 Non-Commercial Project
 
 Camera Dashboard is a personal, non-commercial project created for weather monitoring and public informational use.
 
