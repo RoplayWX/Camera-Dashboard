@@ -42,7 +42,7 @@ The exact frameworks, libraries, APIs, and data providers depend on the current 
 
 <p align="center">
   <a href="https://camera-dashboard-one.vercel.app">
-    <img src="https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/refs/heads/main/Camera-Dashboard-Thumbnail.png" alt="Camera Dashboard Preview" width="900">
+    <img src="https://raw.githubusercontent.com/RoplayWX/Camera-Dashboard/refs/heads/main/Camera-Dashboard-Preview.png" alt="Camera Dashboard Preview" width="900">
   </a>
 </p>
 
