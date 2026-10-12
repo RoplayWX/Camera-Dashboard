@@ -70,7 +70,7 @@ Camera Dashboard displays or links to camera feeds and weather-related resources
 
 **Weather radar & monitoring platforms**
 - [RadarOmega](https://www.radaromega.com/)
-- [WeatherFront](https://weatherfront.app/)
+- [WeatherFront](https://weatherfront.com/)
 - [WeatherWise](https://weatherwise.app/)
 
 These providers and their respective owners retain ownership of their original content, software, trademarks, and media. Their inclusion in Camera Dashboard does not imply sponsorship, partnership, or endorsement.
