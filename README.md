@@ -56,6 +56,8 @@ Camera Dashboard is intended for weather monitoring and informational purposes. 
 
 **Always rely on official National Weather Service alerts and local emergency management instructions for weather-related safety decisions.** Never use this dashboard as your sole source of emergency information.
 
+---
+
 ## 📄 License & Credits
 
 ### 📹 Camera & Data Providers
@@ -86,6 +88,21 @@ Camera Dashboard is an independent project. Unless explicitly stated otherwise, 
 Crediting a provider does not imply permission to redistribute or reuse its footage, imagery, or other content. All third-party content remains subject to its owner's applicable terms and licensing conditions.
 
 The license for Camera Dashboard's own source code, if specified in the repository, applies separately from the rights governing third-party content.
+
+---
+
+### 💚 Non-Commercial Project
+
+Camera Dashboard is a personal, non-commercial project created for weather monitoring and public informational use.
+
+- **No Profit:** No profit or revenue is generated from this application.
+- **No Monetization:** The application is not operated for commercial gain and is not intended to generate income.
+- **No Payments Collected:** Users are not charged to access the dashboard, and no payments are collected by the project.
+- **No Paid Content:** The project does not sell access to camera feeds, radar imagery, weather information, or other displayed resources.
+
+Camera Dashboard is developed and maintained as a hobby project, with the goal of bringing useful weather-monitoring resources together in one convenient place.
+
+Third-party providers may have their own commercial operations, subscription requirements, or usage restrictions. The non-commercial nature of Camera Dashboard does not override those providers' terms or licensing conditions.
 
 ---
 
