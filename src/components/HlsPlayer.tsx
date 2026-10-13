@@ -19,6 +19,8 @@ import {
   ExternalLink,
   Zap,
   Sparkles,
+  Radio,
+  WifiOff,
 } from 'lucide-react';
 import { CameraData, CapturedSnapshot, PTZState, getSourceDisplayName, getSourceBadgeStyle } from '../types/camera';
 
@@ -295,9 +297,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
                 setIsLoading(false);
                 hls.destroy();
                 hlsRef.current = null;
-                if (!isHazCam) {
-                  onInaccessible?.(camera.id);
-                }
                 return;
               }
               hls.startLoad();
@@ -318,9 +317,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               setIsLoading(false);
               hls.destroy();
               hlsRef.current = null;
-              if (!isHazCam) {
-                onInaccessible?.(camera.id);
-              }
               break;
           }
         } else if (data.details === Hls.ErrorDetails.BUFFER_STALLED_ERROR) {
@@ -341,14 +337,13 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         setHasError(true);
         setErrorMessage('Native video playback failed');
         setIsLoading(false);
-        onInaccessible?.(camera.id);
       });
     } else {
       setHasError(true);
       setErrorMessage('HLS playback is not supported on this browser');
       setIsLoading(false);
     }
-  }, [camera.streamUrl, camera.id, autoPlay, jumpToLiveEdge, onInaccessible, isImageStream]);
+  }, [camera.streamUrl, camera.id, autoPlay, jumpToLiveEdge, isImageStream]);
 
   useEffect(() => {
     setupStream();
@@ -902,7 +897,6 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
               setHasError(true);
               setErrorMessage('Feed currently unavailable (404/Network)');
               setIsLoading(false);
-              onInaccessible?.(camera.id);
             }}
             className={`w-full h-full transition-transform duration-100 ease-out select-none ${
               ptz.aspectRatio === 'fill' ? 'object-cover' : 'object-contain'
@@ -964,29 +958,53 @@ export const HlsPlayer: React.FC<HlsPlayerProps> = ({
         )}
 
         {hasError && (
-          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center">
-            <div className="w-10 h-10 rounded-lg bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-3">
-              <AlertTriangle className="w-5 h-5 text-neutral-300" />
-            </div>
-            <h4 className="text-white text-sm uppercase font-bold tracking-wider mb-1">SIGNAL INTERRUPTED</h4>
-            <p className="text-neutral-400 text-xs max-w-md mb-4">{errorMessage || 'Carrier stream offline or rate-limited'}</p>
-            <div className="flex items-center gap-2">
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={setupStream}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-black text-xs font-bold hover:bg-neutral-200 transition-colors cursor-pointer"
-              >
-                <RefreshCw className="w-3.5 h-3.5" /> Reconnect
-              </motion.button>
-              <a
-                href={camera.streamUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white text-xs transition-colors border border-neutral-800"
-              >
-                <ExternalLink className="w-3.5 h-3.5" /> Direct URL
-              </a>
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-6 text-center select-none overflow-hidden">
+            {/* Background scanlines for surveillance monitor authenticity */}
+            <div className="absolute inset-0 scanlines opacity-40 pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col items-center">
+              <div className="w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-3 shadow-2xl relative overflow-hidden">
+                <WifiOff className="w-6 h-6 text-red-500 animate-pulse" />
+              </div>
+
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-2 h-2 rounded-full bg-red-500 shadow-[0_0_8px_#ef4444] animate-ping" />
+                <h4 className="text-white text-base uppercase font-mono font-extrabold tracking-widest">
+                  NO SIGNAL
+                </h4>
+              </div>
+
+              <p className="text-neutral-400 font-mono text-xs max-w-sm mb-1">
+                {errorMessage || 'Station stream offline or carrier unreachable'}
+              </p>
+              <p className="text-neutral-600 font-mono text-[10px] uppercase tracking-wider mb-4">
+                NODE: {camera.cleanName} • {camera.location || 'STATION OFFLINE'}
+              </p>
+
+              <div className="flex items-center gap-2">
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    setHasError(false);
+                    setIsLoading(true);
+                    setupStream();
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-white text-black text-xs font-bold hover:bg-neutral-200 transition-colors cursor-pointer shadow-md"
+                >
+                  <RefreshCw className="w-3.5 h-3.5" /> Retry Signal
+                </motion.button>
+                {camera.streamUrl && (
+                  <a
+                    href={camera.streamUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-neutral-300 hover:text-white text-xs transition-colors border border-neutral-800"
+                  >
+                    <ExternalLink className="w-3.5 h-3.5" /> Direct URL
+                  </a>
+                )}
+              </div>
             </div>
           </div>
         )}

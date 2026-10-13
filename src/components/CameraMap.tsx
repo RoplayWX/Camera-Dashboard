@@ -5,8 +5,11 @@ import 'leaflet.markercluster/dist/MarkerCluster.css';
 import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 import 'leaflet.markercluster';
 import { CameraData, getSourceBadgeStyle } from '../types/camera';
-import { motion } from 'motion/react';
-import { Radio } from 'lucide-react';
+import { WeatherWarning } from '../types/weatherWarning';
+import { fetchActiveWarnings, findNearbyCamerasForWarning, getWarningPriority } from '../services/weatherWarningService';
+import { WeatherWarningPanel } from './WeatherWarningPanel';
+import { motion, AnimatePresence } from 'motion/react';
+import { Radio, AlertTriangle } from 'lucide-react';
 
 interface CameraMapProps {
   cameras: CameraData[];
@@ -39,11 +42,18 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.MarkerClusterGroup | null>(null);
   const radarLayerRef = useRef<L.TileLayer.WMS | null>(null);
+  const warningsLayerRef = useRef<L.LayerGroup | null>(null);
 
   const [showRadar, setShowRadar] = useState(true);
+  const [showWarnings, setShowWarnings] = useState(true);
   const [feedType, setFeedType] = useState<'ALL' | 'DATABASE' | 'RADAR_OMEGA' | 'WEATHER_WISE'>('ALL');
   const [activeRegion, setActiveRegion] = useState<string | null>(null);
 
+  // Weather Warnings State
+  const [warnings, setWarnings] = useState<WeatherWarning[]>([]);
+  const [selectedWarningId, setSelectedWarningId] = useState<string | null>(null);
+
+  // Region preset jump
   const handleRegionClick = useCallback((preset: typeof REGION_PRESETS[0]) => {
     setActiveRegion(preset.name);
     mapInstanceRef.current?.flyTo(preset.center, preset.zoom);
@@ -78,6 +88,77 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
       chasers,
     };
   }, [cameras, selectedState]);
+
+  // Fetch and poll active weather warnings
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadWarnings = async () => {
+      try {
+        const data = await fetchActiveWarnings();
+        if (!isMounted) return;
+        setWarnings(data);
+
+        // If selected warning has expired or is no longer present, clear selection and restore map
+        setSelectedWarningId((currId) => {
+          if (!currId) return null;
+          const stillExists = data.some((w) => w.id === currId);
+          return stillExists ? currId : null;
+        });
+      } catch (err) {
+        console.error('Failed to load active weather warnings', err);
+      }
+    };
+
+    loadWarnings();
+    const interval = setInterval(loadWarnings, 60000);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  // Currently selected warning
+  const selectedWarning = useMemo(() => {
+    if (!selectedWarningId) return null;
+    return warnings.find((w) => w.id === selectedWarningId) || null;
+  }, [warnings, selectedWarningId]);
+
+  // Compute nearby cameras for the selected warning
+  const nearbyCameras = useMemo(() => {
+    if (!selectedWarning) return [];
+    return findNearbyCamerasForWarning(selectedWarning, cameras, 25);
+  }, [selectedWarning, cameras]);
+
+  // Highest priority active warning for dynamic badge coloring
+  const highestPriorityWarning = useMemo(() => {
+    if (warnings.length === 0) return null;
+    let highest = warnings[0];
+    let maxPriority = getWarningPriority(highest.category);
+    for (let i = 1; i < warnings.length; i++) {
+      const p = getWarningPriority(warnings[i].category);
+      if (p > maxPriority) {
+        maxPriority = p;
+        highest = warnings[i];
+      }
+    }
+    return highest;
+  }, [warnings]);
+
+  const alertWidgetStyle = useMemo(() => {
+    if (!showWarnings || warnings.length === 0) {
+      return 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white';
+    }
+    const cat = highestPriorityWarning?.category;
+    if (cat === 'EXTREME_WIND_WARNING') return 'bg-fuchsia-950/90 border-fuchsia-500/90 text-fuchsia-300 shadow-md shadow-fuchsia-900/50';
+    if (cat === 'TORNADO_WARNING') return 'bg-red-950/90 border-red-500/90 text-red-300 shadow-md shadow-red-900/50';
+    if (cat === 'TROPICAL_CYCLONE_WARNING') return 'bg-pink-950/90 border-pink-500/90 text-pink-300 shadow-md shadow-pink-900/50';
+    if (cat === 'SEVERE_THUNDERSTORM_WARNING') return 'bg-amber-950/90 border-amber-500/90 text-amber-300 shadow-md shadow-amber-900/50';
+    if (cat === 'FLASH_FLOOD_WARNING') return 'bg-emerald-950/90 border-emerald-500/90 text-emerald-300 shadow-md shadow-emerald-900/50';
+    if (cat === 'SPECIAL_MARINE_WARNING') return 'bg-orange-950/90 border-orange-500/90 text-orange-300 shadow-md shadow-orange-900/50';
+    return 'bg-amber-950/80 border-amber-500/80 text-amber-200 shadow-md';
+  }, [showWarnings, warnings.length, highestPriorityWarning]);
 
   // Initialize Map
   useEffect(() => {
@@ -114,6 +195,26 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    // Create custom panes for weather warning polygons
+    // warningsPane: zIndex 350 (beneath dimming overlay at 380)
+    map.createPane('warningsPane');
+    const warningsPane = map.getPane('warningsPane');
+    if (warningsPane) warningsPane.style.zIndex = '350';
+
+    // selectedWarningPane: zIndex 450 (above dimming overlay at 380)
+    map.createPane('selectedWarningPane');
+    const selectedWarningPane = map.getPane('selectedWarningPane');
+    if (selectedWarningPane) selectedWarningPane.style.zIndex = '450';
+
+    // Warning polygons layer group
+    warningsLayerRef.current = L.layerGroup().addTo(map);
+
+    // Deselect warning on clicking unoccupied map background
+    map.on('click', () => {
+      setSelectedWarningId(null);
+    });
+
+    // Marker cluster group for camera pins
     markersLayerRef.current = L.markerClusterGroup({
       chunkedLoading: true,
       spiderfyOnMaxZoom: true,
@@ -145,6 +246,7 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
     return () => {
       map.remove();
       mapInstanceRef.current = null;
+      warningsLayerRef.current = null;
     };
   }, []);
 
@@ -176,6 +278,49 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
     }
   }, [showRadar]);
 
+  // Render & Update Weather Warning Polygons
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const layerGroup = warningsLayerRef.current;
+    if (!map || !layerGroup) return;
+
+    layerGroup.clearLayers();
+
+    if (!showWarnings || warnings.length === 0) return;
+
+    for (const warning of warnings) {
+      if (!warning.geometry || (warning.geometry.type !== 'Polygon' && warning.geometry.type !== 'MultiPolygon')) {
+        continue;
+      }
+      const isSelected = selectedWarningId === warning.id;
+
+      try {
+        const geoLayer = L.geoJSON(warning.geometry, {
+          pane: isSelected ? 'selectedWarningPane' : 'warningsPane',
+          style: () => ({
+            color: warning.color,
+            weight: isSelected ? 4 : 2,
+            opacity: isSelected ? 1 : 0.85,
+            fillColor: warning.fillColor,
+            fillOpacity: isSelected ? 0.45 : 0.22,
+            className: isSelected ? 'selected-warning-polygon' : 'warning-polygon-interactive',
+          }),
+          onEachFeature: (_, layer) => {
+            layer.on('click', (e) => {
+              L.DomEvent.stopPropagation(e);
+              // Toggle selection if clicking currently selected polygon, otherwise select new polygon
+              setSelectedWarningId((curr) => (curr === warning.id ? null : warning.id));
+            });
+          },
+        });
+
+        layerGroup.addLayer(geoLayer);
+      } catch (err) {
+        console.error('Error drawing warning polygon', warning.id, err);
+      }
+    }
+  }, [warnings, selectedWarningId, showWarnings]);
+
   const mapIcons = useMemo(() => ({
     chaser: L.divIcon({
       className: 'custom-type-pin',
@@ -194,7 +339,7 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
     }),
   }), []);
 
-  // Update Markers
+  // Update Camera Markers
   useEffect(() => {
     const map = mapInstanceRef.current;
     const markersLayer = markersLayerRef.current;
@@ -272,28 +417,66 @@ export const CameraMap: React.FC<CameraMapProps> = React.memo(({
 
   return (
     <div className={`relative w-full h-full bg-[#000000] overflow-hidden rounded-xl border border-neutral-800 ${className}`}>
+      {/* Leaflet map container */}
       <div ref={mapContainerRef} className="w-full h-full" />
 
+      {/* Map Dimming Overlay (z-index 380: above base tiles, radar, and unselected polygons; below selected polygon and markers) */}
+      <div
+        className="absolute inset-0 bg-black pointer-events-none transition-opacity duration-300 ease-in-out z-[380]"
+        style={{ opacity: selectedWarning && showWarnings ? 0.40 : 0 }}
+      />
+
+      {/* Selected Warning & Nearby Cameras Drawer */}
+      <AnimatePresence>
+        {selectedWarning && showWarnings && (
+          <WeatherWarningPanel
+            warning={selectedWarning}
+            nearbyCameras={nearbyCameras}
+            onClose={() => setSelectedWarningId(null)}
+            onSelectCamera={onSelectCamera}
+            onAddToGrid={onAddToGrid}
+          />
+        )}
+      </AnimatePresence>
+
       {/* HUD Layer with Filtering System and Controls */}
-      <div className="absolute top-3 left-3 z-[400] p-2.5 rounded-xl bg-black/95 border border-neutral-800 flex flex-col gap-2.5 shadow-2xl backdrop-blur-md max-w-xs">
-        {/* Header & NEXRAD Toggle */}
+      <div className="absolute top-3 left-3 z-[400] p-2.5 rounded-xl bg-black/95 border border-neutral-800 flex flex-col gap-2.5 shadow-2xl backdrop-blur-md max-w-xs select-none">
+        {/* Header, Warnings & NEXRAD Toggles */}
         <div className="flex items-center justify-between gap-2 px-0.5">
           <div className="flex items-center gap-1.5">
             <Radio className="w-3.5 h-3.5 text-blue-400" />
             <span className="text-xs font-bold text-white uppercase tracking-wider">US MAP (B&W)</span>
           </div>
 
-          <motion.button
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowRadar(!showRadar)}
-            className={`px-2.5 py-1 rounded-md border text-[11px] font-bold transition-all cursor-pointer ${
-              showRadar
-                ? 'bg-blue-600 border-blue-500 text-white shadow-md'
-                : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
-            }`}
-          >
-            {showRadar ? 'NEXRAD: ON' : 'NEXRAD: OFF'}
-          </motion.button>
+          <div className="flex items-center gap-1.5">
+            {/* Warnings Toggle */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                const nextState = !showWarnings;
+                setShowWarnings(nextState);
+                if (!nextState) setSelectedWarningId(null);
+              }}
+              className={`px-2 py-1 rounded-md border text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${alertWidgetStyle}`}
+              title="Toggle active weather alert polygons"
+            >
+              <AlertTriangle className="w-3 h-3 text-amber-400" />
+              <span>{showWarnings ? `ALERTS: ${warnings.length}` : 'ALERTS: OFF'}</span>
+            </motion.button>
+
+            {/* NEXRAD Radar Toggle */}
+            <motion.button
+              whileTap={{ scale: 0.95 }}
+              onClick={() => setShowRadar(!showRadar)}
+              className={`px-2 py-1 rounded-md border text-[10px] font-bold transition-all cursor-pointer ${
+                showRadar
+                  ? 'bg-blue-600 border-blue-500 text-white shadow-md'
+                  : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              {showRadar ? 'RADAR: ON' : 'RADAR: OFF'}
+            </motion.button>
+          </div>
         </div>
 
         {/* Camera Category Filter Buttons */}

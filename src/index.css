@@ -261,3 +261,31 @@ code, kbd, samp, pre, .font-mono {
 .custom-blue-cluster:hover {
   transform: scale(1.12);
 }
+
+/* Weather Warning Polygons */
+.warning-polygon-interactive {
+  cursor: pointer !important;
+  transition: stroke-width 0.2s ease, fill-opacity 0.2s ease;
+}
+
+.warning-polygon-interactive:hover {
+  stroke-width: 3.5px !important;
+  fill-opacity: 0.38 !important;
+}
+
+.selected-warning-polygon {
+  cursor: pointer !important;
+  animation: warning-pulse-stroke 2s infinite ease-in-out;
+  filter: drop-shadow(0 0 10px currentColor);
+}
+
+@keyframes warning-pulse-stroke {
+  0%, 100% {
+    stroke-opacity: 1;
+    stroke-width: 4px;
+  }
+  50% {
+    stroke-opacity: 0.75;
+    stroke-width: 5px;
+  }
+}

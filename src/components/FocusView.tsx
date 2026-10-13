@@ -27,7 +27,6 @@ interface FocusViewProps {
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
   onJumpToMap: () => void;
   onSelectCamera?: (camera: CameraData) => void;
-  onInaccessible?: (cameraId: string) => void;
 }
 
 export const FocusView: React.FC<FocusViewProps> = React.memo(({
@@ -40,9 +39,9 @@ export const FocusView: React.FC<FocusViewProps> = React.memo(({
   onSnapshot,
   onJumpToMap,
   onSelectCamera,
-  onInaccessible,
 }) => {
-  const [copied, setCopied] = useState<boolean>(false);
+  const [streamCopied, setStreamCopied] = useState<boolean>(false);
+  const [coordsCopied, setCoordsCopied] = useState<boolean>(false);
   const [showMetadata, setShowMetadata] = useState<boolean>(false);
   const [ambientColor, setAmbientColor] = useState<string>('59, 130, 246');
   const [isDragOver, setIsDragOver] = useState<boolean>(false);
@@ -50,8 +49,8 @@ export const FocusView: React.FC<FocusViewProps> = React.memo(({
   const handleCopyUrl = () => {
     if (camera.streamUrl) {
       navigator.clipboard.writeText(camera.streamUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setStreamCopied(true);
+      setTimeout(() => setStreamCopied(false), 2000);
     }
   };
 
@@ -177,10 +176,36 @@ export const FocusView: React.FC<FocusViewProps> = React.memo(({
               </span>
               <span>•</span>
               <button
-                onClick={onJumpToMap}
+                onClick={() => {
+                  navigator.clipboard.writeText(`${camera.coordinates[1].toFixed(4)}, ${camera.coordinates[0].toFixed(4)}`);
+                  setCoordsCopied(true);
+                  setTimeout(() => setCoordsCopied(false), 2000);
+                }}
                 className="text-neutral-300 hover:text-white hover:underline cursor-pointer flex items-center gap-1 font-mono text-[10px]"
               >
-                <Compass className="w-3 h-3 text-blue-400" />
+                <AnimatePresence mode="wait">
+                  {coordsCopied ? (
+                    <motion.span
+                      key="check"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Check className="w-3 h-3 text-green-400" />
+                    </motion.span>
+                  ) : (
+                    <motion.span
+                      key="copy"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      <Copy className="w-3 h-3 text-blue-400" />
+                    </motion.span>
+                  )}
+                </AnimatePresence>
                 <span>
                   {camera.coordinates[1].toFixed(4)}°, {camera.coordinates[0].toFixed(4)}°
                 </span>
@@ -209,8 +234,8 @@ export const FocusView: React.FC<FocusViewProps> = React.memo(({
             className="p-1.5 px-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-neutral-300 hover:text-white transition-all cursor-pointer text-xs flex items-center gap-1 font-medium"
             title="Copy Raw HLS Stream URL"
           >
-            {copied ? <Check className="w-3.5 h-3.5 text-blue-400" /> : <Copy className="w-3.5 h-3.5" />}
-            <span className="hidden md:inline">{copied ? 'Copied' : 'Stream URL'}</span>
+            {streamCopied ? <Check className="w-3.5 h-3.5 text-blue-400" /> : <Copy className="w-3.5 h-3.5" />}
+            <span className="hidden md:inline">{streamCopied ? 'Copied' : 'Stream URL'}</span>
           </motion.button>
 
           <motion.button
@@ -249,7 +274,6 @@ export const FocusView: React.FC<FocusViewProps> = React.memo(({
           muted={false}
           onSnapshot={onSnapshot}
           onAmbientColorChange={setAmbientColor}
-          onInaccessible={onInaccessible}
           className="w-full h-full flex-1"
         />
 

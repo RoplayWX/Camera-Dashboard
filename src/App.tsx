@@ -5,8 +5,6 @@ import {
   CURATED_FEATURED_CAMERAS,
   getFavoriteIds,
   toggleFavorite,
-  getInaccessibleIds,
-  markCameraInaccessible,
 } from './services/cameraService';
 import { Header } from './components/Header';
 import { Sidebar } from './components/Sidebar';
@@ -41,12 +39,10 @@ export default function App() {
   const [snapshots, setSnapshots] = useState<CapturedSnapshot[]>([]);
   const [isGalleryOpen, setIsGalleryOpen] = useState<boolean>(false);
 
-  // Inaccessible & dead streams pruning
-  const [inaccessibleIds, setInaccessibleIds] = useState<Set<string>>(() => getInaccessibleIds());
-
   // Responsive UI & State Filter
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [selectedState, setSelectedState] = useState<string>('');
+  const [promotedCameraId, setPromotedCameraId] = useState<string | null>(null);
 
   // Fetch full camera dataset on mount and randomize landing camera
   useEffect(() => {
@@ -188,20 +184,6 @@ export default function App() {
     });
   }, []);
 
-  const handleMarkInaccessible = useCallback((id: string) => {
-    markCameraInaccessible(id);
-    setInaccessibleIds((prev) => new Set(prev).add(id));
-    setCameras((prev) => prev.filter((c) => c.id !== id));
-    setGridCameras((prev) => prev.map((c) => (c?.id === id ? null : c)));
-    setSelectedCamera((curr) => {
-      if (curr.id === id) {
-        const next = cameras.find((c) => c.id !== id);
-        return next || CURATED_FEATURED_CAMERAS[0];
-      }
-      return curr;
-    });
-  }, [cameras]);
-
   const handleSnapshotCaptured = useCallback((snap: CapturedSnapshot) => {
     setSnapshots((prev) => [snap, ...prev]);
   }, []);
@@ -243,9 +225,7 @@ export default function App() {
             onSelectState={setSelectedState}
             onSelectCamera={(cam) => {
               setSelectedCamera(cam);
-              if (cam.stateCode) {
-                setSelectedState(cam.stateCode);
-              }
+              setViewMode('focus');
               if (window.innerWidth < 1024) {
                 setIsSidebarOpen(false);
               }
@@ -256,7 +236,16 @@ export default function App() {
             onRandomFeed={handleRandomFeed}
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen((v) => !v)}
-            onGoBack={selectedState ? () => setSelectedState('') : undefined}
+            promotedCameraId={promotedCameraId}
+            onPromoteCamera={setPromotedCameraId}
+            onGoBack={
+              selectedState || promotedCameraId
+                ? () => {
+                    if (promotedCameraId) setPromotedCameraId(null);
+                    if (selectedState) setSelectedState('');
+                  }
+                : undefined
+            }
             className="w-full h-full"
           />
         </div>
@@ -283,7 +272,6 @@ export default function App() {
                   onSnapshot={handleSnapshotCaptured}
                   onJumpToMap={() => setViewMode('map')}
                   onSelectCamera={setSelectedCamera}
-                  onInaccessible={handleMarkInaccessible}
                 />
               </motion.div>
             )}
@@ -307,7 +295,6 @@ export default function App() {
                   }}
                   onUpdateSlot={handleUpdateGridSlot}
                   onSnapshot={handleSnapshotCaptured}
-                  onInaccessible={handleMarkInaccessible}
                 />
               </motion.div>
             )}
@@ -326,6 +313,7 @@ export default function App() {
                   selectedCamera={selectedCamera}
                   selectedState={selectedState}
                   onSelectCamera={(cam) => {
+                    setPromotedCameraId(cam.id);
                     setSelectedCamera(cam);
                     setViewMode('focus');
                   }}

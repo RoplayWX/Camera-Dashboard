@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useDeferredValue } from 'react';
+import React, { useState, useMemo, useDeferredValue, useRef, useEffect, useCallback } from 'react';
 import { CameraData, CameraSourceFilter, isChaser } from '../types/camera';
 import { US_STATES } from '../services/cameraService';
 import { motion, AnimatePresence } from 'motion/react';
@@ -192,6 +192,8 @@ interface SidebarProps {
   onClose?: () => void;
   isOpen?: boolean;
   onGoBack?: () => void;
+  promotedCameraId?: string | null;
+  onPromoteCamera?: (id: string | null) => void;
 }
 
 const ITEMS_PER_PAGE = 40;
@@ -212,6 +214,8 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
   onClose,
   isOpen = true,
   onGoBack,
+  promotedCameraId,
+  onPromoteCamera,
 }) => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const deferredQuery = useDeferredValue(searchQuery);
@@ -225,6 +229,24 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
     setInternalSelectedState(st);
     setPage(1);
   };
+
+  const listContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (promotedCameraId) {
+      setPage(1);
+      listContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [promotedCameraId]);
+
+  const handleItemClick = useCallback((cam: CameraData) => {
+    // Only promote camera to the top of the sidebar if user searched for it!
+    if (searchQuery.trim().length > 0) {
+      onPromoteCamera?.(cam.id);
+      setPage(1);
+    }
+    onSelectCamera(cam);
+  }, [searchQuery, onPromoteCamera, onSelectCamera]);
 
   // Compute camera counts per state dynamically
   const stateCounts = useMemo(() => {
@@ -299,16 +321,21 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       );
     });
 
-    if (selectedCamera) {
-      const idx = result.findIndex((c) => c.id === selectedCamera.id);
+    if (promotedCameraId) {
+      const idx = result.findIndex((c) => c.id === promotedCameraId);
       if (idx > 0) {
         const [match] = result.splice(idx, 1);
         result.unshift(match);
+      } else if (idx === -1) {
+        const match = cameras.find((c) => c.id === promotedCameraId);
+        if (match) {
+          result.unshift(match);
+        }
       }
     }
 
     return result;
-  }, [cameras, deferredQuery, sourceFilter, selectedState, favoriteIds, selectedCamera]);
+  }, [cameras, deferredQuery, sourceFilter, selectedState, favoriteIds, promotedCameraId]);
 
   const totalPages = Math.max(1, Math.ceil(filteredCameras.length / ITEMS_PER_PAGE));
   const currentPage = Math.min(page, totalPages);
@@ -677,7 +704,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
       </div>
 
       {/* Scrollable Camera List */}
-      <div className="flex-1 overflow-y-auto divide-y divide-neutral-900 p-1.5 space-y-0.5">
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto divide-y divide-neutral-900 p-1.5 space-y-0.5">
         {paginatedList.length === 0 ? (
           <div className="py-12 px-4 text-center text-neutral-500 text-xs">
             <Filter className="w-8 h-8 mx-auto mb-2 opacity-30 text-white" />
@@ -700,7 +727,7 @@ export const Sidebar: React.FC<SidebarProps> = React.memo(({
               cam={cam}
               isSelected={selectedCamera?.id === cam.id}
               isFav={favoriteIds.has(cam.id)}
-              onSelectCamera={onSelectCamera}
+              onSelectCamera={handleItemClick}
               onToggleFavorite={onToggleFavorite}
               onAddToGrid={onAddToGrid}
             />

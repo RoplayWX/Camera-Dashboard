@@ -78,8 +78,8 @@ export const Header: React.FC<HeaderProps> = React.memo(({
         <div className="flex items-center gap-2.5">
           <div className="relative w-7 h-7 rounded-lg bg-neutral-950 border border-neutral-800 flex items-center justify-center overflow-hidden">
             <motion.div
-              animate={{ opacity: [1, 0.4], scale: [1, 0.95] }}
-              transition={{ duration: 2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }}
+              animate={{ opacity: [1, 0.2, 1], scale: [1, 0.92, 1] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: [0.42, 0, 0.58, 1] }}
             >
               <Radio className="w-3.5 h-3.5 text-white" />
             </motion.div>
@@ -92,7 +92,7 @@ export const Header: React.FC<HeaderProps> = React.memo(({
                 CAMERA <span className="text-blue-500">DASHBOARD</span>
               </span>
               <span className="px-1.5 py-0.5 rounded bg-blue-500/20 border border-blue-500/40 text-[9px] font-bold text-blue-300 font-mono tracking-wider">
-                V1.5
+                V1.6
               </span>
             </div>
             <div className="hidden sm:flex items-center gap-2 font-mono text-[10px]">

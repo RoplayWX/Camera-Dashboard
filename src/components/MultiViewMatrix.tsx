@@ -23,7 +23,6 @@ interface MultiViewMatrixProps {
   onSelectFocus: (camera: CameraData) => void;
   onUpdateSlot: (index: number, camera: CameraData | null) => void;
   onSnapshot?: (snapshot: CapturedSnapshot) => void;
-  onInaccessible?: (cameraId: string) => void;
 }
 
 export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = React.memo(({
@@ -33,7 +32,6 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = React.memo(({
   onSelectFocus,
   onUpdateSlot,
   onSnapshot,
-  onInaccessible,
 }) => {
   const slotCount = layout === 'grid-2x2' ? 4 : 9;
   const [activeAudioSlot, setActiveAudioSlot] = useState<number | null>(null);
@@ -409,7 +407,6 @@ export const MultiViewMatrix: React.FC<MultiViewMatrixProps> = React.memo(({
                   autoPlay={true}
                   muted={!isAudioActive}
                   onSnapshot={onSnapshot}
-                  onInaccessible={onInaccessible}
                   compact={true}
                   showTopHud={false}
                   showControls={false}
