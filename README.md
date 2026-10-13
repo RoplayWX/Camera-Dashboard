@@ -50,6 +50,8 @@ The exact frameworks, libraries, APIs, and data providers depend on the current 
   <i>Click the preview to open Camera Dashboard.</i>
 </p>
 
+<sub><i>Preview from Version 1.5; details subject to change.</i></sub>
+
 ## ⚠️ Disclaimer
 
 Camera Dashboard is intended for weather monitoring and informational purposes. Data availability, camera feeds, radar imagery, and alert updates may depend on external services and may experience delays or interruptions.
