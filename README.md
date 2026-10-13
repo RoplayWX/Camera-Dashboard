@@ -51,9 +51,7 @@ The exact frameworks, libraries, APIs, and data providers depend on the current 
 </p>
 
 <p align="center">
-  <sub>
-    <span style="color: #8b949e;"><em>Preview from Version 1.5; details subject to change.</em></span>
-  </sub>
+  <sup><em>Preview from Version 1.5; details subject to change.</em></sup>
 </p>
 
 ## ⚠️ Disclaimer
