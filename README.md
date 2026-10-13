@@ -50,7 +50,9 @@ The exact frameworks, libraries, APIs, and data providers depend on the current 
   <i>Click the preview to open Camera Dashboard.</i>
 </p>
 
-<sub><i>Preview from Version 1.5; details subject to change.</i></sub>
+<p align="center">
+  <sup><sub><i>Preview from Version 1.5; details subject to change.</i></sub></sup>
+</p>
 
 ## ⚠️ Disclaimer
 
